@@ -1,0 +1,33 @@
+{
+  "name": "sakai-react",
+  "version": "10.1.0",
+  "private": true,
+  "scripts": {
+    "check:data": "ts-node app/data/tests/check-catalog.ts",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "format": "prettier --write \"{app,demo,layout,types}/**/*.{js,ts,tsx,d.ts}\"",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@types/react": "18.2.12",
+    "@types/react-dom": "18.2.5",
+    "chart.js": "4.2.1",
+    "next": "13.4.8",
+    "primeflex": "^3.3.1",
+    "primeicons": "^6.0.1",
+    "primereact": "10.2.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "eslint": "8.43.0",
+    "eslint-config-next": "13.4.6",
+    "prettier": "^2.8.8",
+    "sass": "^1.63.4",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
