@@ -13,7 +13,8 @@ import { MultiSelect } from 'primereact/multiselect';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Sidebar } from 'primereact/sidebar';
 import Link from 'next/link';
-import { gc2CurriculumEnriched } from '@/app/data/curricula/gc2.enriched';
+
+
 
 // ---------- Types ----------
 interface Student {

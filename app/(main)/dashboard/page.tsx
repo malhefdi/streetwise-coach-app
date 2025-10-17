@@ -9,9 +9,10 @@ import { Tag } from 'primereact/tag';
 import { ProgressBar } from 'primereact/progressbar';
 import { Chart } from 'primereact/chart';
 import { Divider } from 'primereact/divider';
+import { getCurriculum } from '@/app/data/curriculumEngine';
+import type { Lesson, Slice } from '@/app/data/types/curriculum.types';
 
-import type { Lesson } from '@/app/data/catalog';
-import { getCurriculum } from '@/app/data/catalog';
+
 
 
 
@@ -264,14 +265,14 @@ const DashboardPage = () => {
               <h3 className="mb-3">Lessons Overview</h3>
               <div className="grid">
                 {lessons.map((l) => {
-                  const id = `gc2-l${l.lesson}`;
+                  const id = `gc2-l${l.lessonNumber}`;
                   const pct = lessonCompletion(id);
                   return (
                     <div className="col-12 md:col-6 lg:col-4" key={id}>
-                      <Link href={`/coach?lesson=${l.lesson}`} className="no-underline">
+                      <Link href={`/coach?lesson=${l.lessonNumber}`} className="no-underline">
                         <Card className="surface-card border-round-xl shadow-1 sw-hover-card h-full p-3">
                           <div className="text-xs text-color-secondary mb-1">{l.position}</div>
-                          <div className="font-medium mb-2">{`L${l.lesson} — ${l.technique}`}</div>
+                          <div className="font-medium mb-2">{`L${l.lessonNumber} — ${l.technique}`}</div>
                           <ProgressBar value={pct} className="sw-progress mb-2" pt={{ value: { style: gradientStyle } }} />
                           <div className="flex justify-content-between align-items-center">
                             <Tag value={`${pct}%`} />

@@ -9,8 +9,8 @@ import { Slider } from 'primereact/slider';
 import { ProgressBar } from 'primereact/progressbar';
 import { Tag } from 'primereact/tag';
 import { Dropdown } from 'primereact/dropdown';
-import type { Lesson, Slice, Step } from '@/app/data/catalog';
-import { getCurriculum } from '@/app/data/catalog';
+import { getCurriculum } from '@/app/data/curriculumEngine';
+import type { Lesson, Slice } from '@/app/data/types/curriculum.types';
 
 const gc2CurriculumEnriched = getCurriculum('gc2');
 // ---------- Types ----------
@@ -78,7 +78,7 @@ const lessons: Lesson[] = gc2CurriculumEnriched.lessons;
   useEffect(() => saveSession(session), [session]);
 
   // ---------- Compute ----------
-  const lessonIdOf = (l: Lesson) => `gc2-l${l.lesson}`;
+  const lessonIdOf = (l: Lesson) => `gc2-l${l.lessonNumber}`;
   const sliceKeyOf = (lessonId: string, sIdx: number) => `${lessonId}-s${sIdx + 1}`;
 
   const computeLessonCompletion = (lessonId: string) => {
@@ -193,7 +193,7 @@ const lessons: Lesson[] = gc2CurriculumEnriched.lessons;
                   key={lessonId}
                   header={
                     <div className="flex justify-content-between align-items-center w-full">
-                      <span className="font-bold text-primary">{`L${lesson.lesson} — ${lesson.technique}`}</span>
+                      <span className="font-bold text-primary">{`L${lesson.lessonNumber} — ${lesson.technique}`}</span>
                       <div className="w-20rem sm:w-24rem md:w-28rem">
                         <ProgressBar value={progress} showValue className="sw-progress" />
                       </div>
