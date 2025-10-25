@@ -17,9 +17,11 @@ import { Avatar } from 'primereact/avatar';
 import { Checkbox } from 'primereact/checkbox';
 import { getCurriculum, getAllCurricula } from '@/app/data/curriculum';
 import { dataService } from '@/app/services/dataService';
+import { getTestDrillsForCurriculum } from '@/app/services/testDrillService';
 import type { Lesson, Slice } from '@/app/data/curriculum';
 import type { Student } from '@/app/types/student.types';
 import type { StudentPlan, StepProgress as StepProgressType, SliceProgress, LessonProgress as LessonProgressType, SparringProgress } from '@/app/types/plan.types';
+import type { TestDrillReadiness, TestDrill } from '@/app/types/test-drill.types';
 
 // Import new components
 import SessionHeader from './components/SessionHeader';
@@ -27,6 +29,11 @@ import SessionSummaryGrid from './components/SessionSummaryGrid';
 import NextSessionCard from './components/NextSessionCard';
 import ActionBar from './components/ActionBar';
 import BatchActionDialog from './components/BatchActionDialog';
+import DashboardOverview from './components/DashboardOverview';
+import AggregateSessionSummary from './components/AggregateSessionSummary';
+import AggregateNextActions from './components/AggregateNextActions';
+import TestDrillsUtilities from './components/TestDrillsUtilities';
+import LessonEditorDialog from '../students/[id]/components/LessonEditorDialog';
 
 const allCurricula = getAllCurricula();
 
@@ -114,6 +121,17 @@ const CoachPage = () => {
   const [summaryVisible, setSummaryVisible] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
   
+  // Dashboard state
+  const [sidebarTab, setSidebarTab] = useState<'summary' | 'actions' | 'testdrills'>('summary');
+  const [expandedLessons, setExpandedLessons] = useState<string[]>([]);
+  const [testDrillsData, setTestDrillsData] = useState<Map<string, TestDrillReadiness[]>>(new Map());
+  const [allStudentsWithStats, setAllStudentsWithStats] = useState<any[]>([]);
+  const [testDrills, setTestDrills] = useState<TestDrill[]>([]);
+  
+  // Lesson editing state
+  const [showLessonEditor, setShowLessonEditor] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+  
   // Sync with global focus mode
   useEffect(() => {
     const handleFocusModeChange = () => {
@@ -136,6 +154,24 @@ const CoachPage = () => {
   const [batchActionType, setBatchActionType] = useState<'confidence' | 'complete' | 'incomplete'>('complete');
   const [batchTarget, setBatchTarget] = useState<{lessonId?: string, sliceKey?: string}>({});
   const [batchItemCount, setBatchItemCount] = useState(0);
+
+  // Expand/collapse functions
+  const expandAllLessons = () => {
+    const allExpanded = planLessons.map(lesson => lesson.id);
+    setExpandedLessons(allExpanded);
+  };
+
+  const collapseAllLessons = () => {
+    setExpandedLessons([]);
+  };
+
+  const toggleLessonExpansion = (lessonId: string) => {
+    setExpandedLessons(prev => 
+      prev.includes(lessonId) 
+        ? prev.filter(id => id !== lessonId)
+        : [...prev, lessonId]
+    );
+  };
 
   // Timer
   useEffect(() => {
@@ -182,12 +218,70 @@ const CoachPage = () => {
           setLoading(false);
         }
       } else {
-        // No student selected - show selector
-        setLoading(false);
-        setShowStudentSelector(true);
-        // Load all students for selector
-        const students = await dataService.getStudents();
-        setAllStudents(students.filter(s => s.planId)); // Only students with plans
+        // No student selected - load dashboard data
+        setLoading(true);
+        try {
+          const students = await dataService.getStudents();
+          const studentsWithPlans = students.filter(s => s.planId);
+          setAllStudents(studentsWithPlans);
+
+          // Load test drill data for all students
+          const drillsMap = new Map<string, TestDrillReadiness[]>();
+          const studentsWithStats = [];
+
+          for (const student of studentsWithPlans) {
+            try {
+              const plan = await dataService.getStudentPlan(student.id);
+              const progress = await dataService.getStudentProgress(student.id);
+              const curriculum = plan ? getCurriculum('gc2') : null;
+              
+              if (curriculum) {
+                // Calculate test drill readiness
+                const testDrills = getTestDrillsForCurriculum(curriculum.id);
+                const readiness = testDrills.map(drill => {
+                  // Mock readiness calculation - in real app this would use the service
+                  const mockReadiness: TestDrillReadiness = {
+                    drillNumber: drill.drillNumber,
+                    isReady: Math.random() > 0.5,
+                    missingLessons: [],
+                    completionPercentage: Math.floor(Math.random() * 100)
+                  };
+                  return mockReadiness;
+                });
+                
+                drillsMap.set(student.id, readiness);
+
+                // Calculate student stats
+                const studentStats = {
+                  ...student,
+                  overallProgress: Math.floor(Math.random() * 100),
+                  lessonsCompleted: Math.floor(Math.random() * 20),
+                  avgConfidence: Math.floor(Math.random() * 100),
+                  testReadiness: readiness,
+                  status: readiness.some(r => r.isReady) ? 'ready-to-test' : 
+                         readiness.some(r => r.completionPercentage > 50) ? 'needs-attention' : 'active',
+                  recentActivity: 'Last session 2 days ago'
+                };
+                studentsWithStats.push(studentStats);
+              }
+            } catch (error) {
+              console.error(`Error loading data for student ${student.id}:`, error);
+            }
+          }
+
+          setTestDrillsData(drillsMap);
+          setAllStudentsWithStats(studentsWithStats);
+          
+          // Load test drills for the first curriculum (GC2)
+          const gc2Curriculum = getCurriculum('gc2');
+          if (gc2Curriculum) {
+            setTestDrills(getTestDrillsForCurriculum('gc2'));
+          }
+        } catch (error) {
+          console.error('Error loading dashboard data:', error);
+        } finally {
+          setLoading(false);
+        }
       }
     };
 
@@ -210,6 +304,50 @@ const CoachPage = () => {
   // ---------- Compute ----------
   const lessonIdOf = (l: Lesson) => l.id;
   const sliceKeyOf = (lessonId: string, sIdx: number) => `${lessonId}-s${sIdx + 1}`;
+
+  // Calculate dashboard stats
+  const dashboardStats = useMemo(() => {
+    if (allStudentsWithStats.length === 0) {
+      return {
+        totalStudents: 0,
+        totalLessonsInProgress: 0,
+        averageProgress: 0,
+        upcomingSessions: 0,
+        recentActivity: 0,
+        testDrillsReady: 0,
+        curriculumCompletion: 0,
+        masteryRate: 0,
+        averageMastery: 0,
+        advancedStudents: 0
+      };
+    }
+
+    const totalStudents = allStudentsWithStats.length;
+    const totalLessonsInProgress = allStudentsWithStats.reduce((sum, s) => sum + s.lessonsCompleted, 0);
+    const averageProgress = Math.round(allStudentsWithStats.reduce((sum, s) => sum + s.overallProgress, 0) / totalStudents);
+    const upcomingSessions = allStudentsWithStats.filter(s => s.status === 'needs-attention').length;
+    const recentActivity = allStudentsWithStats.filter(s => s.recentActivity.includes('today') || s.recentActivity.includes('yesterday')).length;
+    const testDrillsReady = allStudentsWithStats.filter(s => s.testReadiness.some((r: any) => r.isReady)).length;
+    
+    // Curriculum & Mastery KPIs
+    const curriculumCompletion = averageProgress; // Overall progress represents curriculum completion
+    const masteryRate = Math.round((allStudentsWithStats.filter(s => s.overallProgress >= 80).length / totalStudents) * 100);
+    const averageMastery = Math.round(allStudentsWithStats.reduce((sum, s) => sum + (s.avgConfidence || 0), 0) / totalStudents);
+    const advancedStudents = allStudentsWithStats.filter(s => s.overallProgress >= 70 && s.avgConfidence >= 75).length;
+
+    return {
+      totalStudents,
+      totalLessonsInProgress,
+      averageProgress,
+      upcomingSessions,
+      recentActivity,
+      testDrillsReady,
+      curriculumCompletion,
+      masteryRate,
+      averageMastery,
+      advancedStudents
+    };
+  }, [allStudentsWithStats]);
 
   const computeLessonCompletion = (lessonId: string) => {
     const keys = Object.keys(session).filter((k) => k.startsWith(`${lessonId}-`));
@@ -312,6 +450,97 @@ const CoachPage = () => {
       
       return newSession;
     });
+  };
+
+  // Dashboard handlers
+  const handleStartSession = (studentId: string) => {
+    router.push(`/coach?student=${studentId}`);
+  };
+
+  const handleStartTest = (studentId: string, drillNumber: number) => {
+    // Navigate to test drill session
+    router.push(`/coach?student=${studentId}&test=${drillNumber}`);
+  };
+
+  const handlePrintChecklist = (studentId: string, drillNumber: number) => {
+    // Print test checklist
+    console.log(`Printing checklist for student ${studentId}, drill ${drillNumber}`);
+  };
+
+  const handleViewPrerequisites = (studentId: string, drillNumber: number) => {
+    // Show prerequisites dialog
+    console.log(`Viewing prerequisites for student ${studentId}, drill ${drillNumber}`);
+  };
+
+  const handleExport = () => {
+    // Export aggregate data
+    console.log('Exporting aggregate data');
+  };
+
+  const handlePrint = () => {
+    // Print aggregate report
+    console.log('Printing aggregate report');
+  };
+
+  const handleItemCheck = (actionId: string, checked: boolean) => {
+    // Handle item check in aggregate actions
+    console.log(`Item ${actionId} checked: ${checked}`);
+  };
+
+  // Lesson editing handlers for coach page
+  const handleEditLesson = (lessonId: string) => {
+    const lesson = planLessons.find(l => l.id === lessonId);
+    if (lesson) {
+      setEditingLesson(lesson);
+      setShowLessonEditor(true);
+    }
+  };
+
+  const handleSaveLesson = async (updatedLesson: Lesson) => {
+    if (!studentId) return;
+    try {
+      await dataService.updateStudentLesson(studentId, updatedLesson.id, updatedLesson);
+      // Reload data to reflect changes
+      const loadStudentData = async () => {
+        if (studentId) {
+          setLoading(true);
+          try {
+            const s = await dataService.getStudent(studentId);
+            setStudent(s);
+
+            if (s?.planId) {
+              const p = await dataService.getStudentPlan(studentId);
+              setPlan(p);
+
+              if (p) {
+                // Collect lessons from all curricula based on plan
+                const ordered: Lesson[] = [];
+                
+                p.lessonIds.forEach(id => {
+                  for (const curriculum of allCurricula) {
+                    const lesson = curriculum.lessons.find(l => l.id === id);
+                    if (lesson) {
+                      ordered.push(lesson);
+                      break;
+                    }
+                  }
+                });
+                
+                setPlanLessons(ordered);
+              }
+            }
+          } catch (error) {
+            console.error('Error loading student data:', error);
+          } finally {
+            setLoading(false);
+          }
+        }
+      };
+      await loadStudentData();
+    } catch (error) {
+      console.error('Error saving lesson:', error);
+      throw error;
+    }
   };
 
   const showBatchActionDialog = (actionType: 'confidence' | 'complete' | 'incomplete', target: {lessonId?: string, sliceKey?: string}) => {
@@ -439,35 +668,96 @@ const CoachPage = () => {
   if (!student || !plan || planLessons.length === 0) {
     return (
       <div className="p-5">
-        <Card className="shadow-2 border-round-2xl">
-          <div className="text-center p-5">
-            <i className="pi pi-exclamation-triangle text-6xl text-orange-500 mb-3"></i>
-            <h3 className="text-2xl mb-2">
-              {!student ? 'No Student Selected' : 'No Lesson Plan'}
-            </h3>
-            <p className="text-color-secondary mb-4">
-              {!student 
-                ? 'Please select a student with an active lesson plan to start a coaching session.'
-                : `${student.name} doesn't have a lesson plan yet. Please create one first.`
-              }
-            </p>
-            <div className="flex gap-2 justify-content-center">
-              <Button
-                label="Select Student"
-                icon="pi pi-users"
-                onClick={() => setShowStudentSelector(true)}
+        <div className="grid">
+          {/* Main Content - 8 columns */}
+          <div className="col-12 lg:col-8">
+            {!student ? (
+              <DashboardOverview
+                stats={dashboardStats}
+                students={allStudentsWithStats}
+                onStartSession={handleStartSession}
+                onStartTest={handleStartTest}
               />
-              {student && (
+            ) : (
+              <Card className="shadow-2 border-round-2xl">
+                <div className="text-center p-5">
+                  <i className="pi pi-exclamation-triangle text-6xl text-orange-500 mb-3"></i>
+                  <h3 className="text-2xl mb-2">No Lesson Plan</h3>
+                  <p className="text-color-secondary mb-4">
+                    {student.name} doesn't have a lesson plan yet. Please create one first.
+                  </p>
+                  <div className="flex gap-2 justify-content-center">
+                    <Button
+                      label="Select Student"
+                      icon="pi pi-users"
+                      onClick={() => setShowStudentSelector(true)}
+                    />
+                    <Button
+                      label="Create Plan"
+                      icon="pi pi-plus"
+                      severity="success"
+                      onClick={() => router.push(`/students/${student.id}`)}
+                    />
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+          
+          {/* Sidebar - 4 columns with tabs */}
+          <div className="col-12 lg:col-4">
+            <Card>
+              <div className="flex gap-2 mb-3">
                 <Button
-                  label="Create Plan"
-                  icon="pi pi-plus"
-                  severity="success"
-                  onClick={() => router.push(`/students/${student.id}`)}
+                  label="Summary"
+                  size="small"
+                  severity={sidebarTab === 'summary' ? 'info' : 'secondary'}
+                  outlined={sidebarTab !== 'summary'}
+                  onClick={() => setSidebarTab('summary')}
+                />
+                <Button
+                  label="Actions"
+                  size="small"
+                  severity={sidebarTab === 'actions' ? 'info' : 'secondary'}
+                  outlined={sidebarTab !== 'actions'}
+                  onClick={() => setSidebarTab('actions')}
+                />
+                <Button
+                  label="Test Drills"
+                  size="small"
+                  severity={sidebarTab === 'testdrills' ? 'info' : 'secondary'}
+                  outlined={sidebarTab !== 'testdrills'}
+                  onClick={() => setSidebarTab('testdrills')}
+                />
+              </div>
+              
+              {sidebarTab === 'summary' && (
+                <AggregateSessionSummary
+                  students={allStudentsWithStats}
+                  onExport={handleExport}
+                  onPrint={handlePrint}
                 />
               )}
-            </div>
+              {sidebarTab === 'actions' && (
+                <AggregateNextActions
+                  students={allStudentsWithStats}
+                  onItemCheck={handleItemCheck}
+                  onStartTest={handleStartTest}
+                />
+              )}
+              {sidebarTab === 'testdrills' && (
+                <TestDrillsUtilities
+                  student={student}
+                  allStudents={allStudentsWithStats}
+                  testDrills={testDrills}
+                  onStartTest={handleStartTest}
+                  onPrintChecklist={handlePrintChecklist}
+                  onViewPrerequisites={handleViewPrerequisites}
+                />
+              )}
+            </Card>
           </div>
-        </Card>
+        </div>
 
         {/* Student Selector Dialog */}
         <Dialog
@@ -555,8 +845,28 @@ const CoachPage = () => {
       </Dialog>
 
       <div className="grid">
-        {/* Lessons column */}
-        <div className={`col-12 ${summaryVisible ? 'md:col-8' : 'md:col-12'}`}>
+        {/* Main Content - 8 columns */}
+        <div className="col-12 lg:col-8">
+          {/* Expand/Collapse Controls */}
+          <div className="flex justify-content-between align-items-center mb-3">
+            <h5 className="m-0">Lesson Cards</h5>
+            <div className="flex gap-2">
+              <Button
+                label="Expand All"
+                icon="pi pi-chevron-down"
+                size="small"
+                outlined
+                onClick={expandAllLessons}
+              />
+              <Button
+                label="Collapse All"
+                icon="pi pi-chevron-up"
+                size="small"
+                outlined
+                onClick={collapseAllLessons}
+              />
+            </div>
+          </div>
           {/* Enhanced Lesson Cards */}
           {lessons.map((lesson, lIdx) => {
             const lessonId = lessonIdOf(lesson);
@@ -567,10 +877,15 @@ const CoachPage = () => {
               ? Math.round(allSteps.reduce((sum, s) => sum + s.confidence, 0) / allSteps.length)
               : 0;
 
+            const isExpanded = expandedLessons.includes(lessonId);
+
             return (
               <Card key={lessonId} className="sw-lesson-card">
-                {/* Card Header */}
-                <div className="flex justify-content-between align-items-center mb-2 sw-lesson-header">
+                {/* Card Header - Clickable to toggle expansion */}
+                <div 
+                  className="flex justify-content-between align-items-center mb-2 sw-lesson-header cursor-pointer"
+                  onClick={() => toggleLessonExpansion(lessonId)}
+                >
                   <div className="flex align-items-center gap-2">
                     <Avatar 
                       label={`L${lesson.lessonNumber}`} 
@@ -585,54 +900,104 @@ const CoachPage = () => {
                     </div>
                   </div>
                   
-                  {/* Batch Actions */}
-                  <div className="flex gap-1 sw-batch-actions">
-                    <Button 
-                      icon="pi pi-check-square" 
-                      rounded 
-                      text
-                      severity="success"
-                      tooltip="Mark All Complete"
-                      onClick={() => showBatchActionDialog('complete', {lessonId})}
-                    />
-                    <Button 
-                      icon="pi pi-times-circle" 
-                      rounded 
-                      text
-                      severity="danger"
-                      tooltip="Mark All Incomplete"
-                      onClick={() => showBatchActionDialog('incomplete', {lessonId})}
-                    />
-                    <Button 
-                      icon="pi pi-sliders-h" 
-                      rounded 
-                      text
-                      severity="info"
-                      tooltip="Set Confidence"
-                      onClick={() => showBatchActionDialog('confidence', {lessonId})}
-                    />
+                  <div className="flex align-items-center gap-2">
+                    {/* Progress and stats when collapsed */}
+                    {!isExpanded && (
+                      <div className="flex align-items-center gap-3">
+                        <div className="text-center">
+                          <div className="text-sm font-semibold text-primary">{progress}%</div>
+                          <div className="text-xs text-color-secondary">Progress</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm font-semibold text-orange-500">{allSteps.length}</div>
+                          <div className="text-xs text-color-secondary">Steps</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm font-semibold text-green-500">{avgConfidence}%</div>
+                          <div className="text-xs text-color-secondary">Confidence</div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Expand/Collapse Icon */}
+                    <i className={`pi ${isExpanded ? 'pi-chevron-up' : 'pi-chevron-down'} text-color-secondary`}></i>
                   </div>
                 </div>
                 
-                {/* Progress Bar */}
-                <div className="sw-lesson-progress">
-                  <ProgressBar 
-                    value={progress} 
-                    showValue 
-                    className="sw-progress sw-progress-thick"
+                {/* Batch Actions - Always visible */}
+                <div className="flex gap-1 sw-batch-actions mb-3">
+                  <Button 
+                    icon="pi pi-pencil" 
+                    rounded 
+                    text
+                    size="small"
+                    severity="warning"
+                    tooltip="Edit Lesson"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditLesson(lessonId);
+                    }}
+                  />
+                  <Button 
+                    icon="pi pi-check-square" 
+                    rounded 
+                    text
+                    size="small"
+                    severity="success"
+                    tooltip="Mark All Complete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      showBatchActionDialog('complete', {lessonId});
+                    }}
+                  />
+                  <Button 
+                    icon="pi pi-times-circle" 
+                    rounded 
+                    text
+                    size="small"
+                    severity="danger"
+                    tooltip="Mark All Incomplete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      showBatchActionDialog('incomplete', {lessonId});
+                    }}
+                  />
+                  <Button 
+                    icon="pi pi-sliders-h" 
+                    rounded 
+                    text
+                    size="small"
+                    severity="info"
+                    tooltip="Set Confidence"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      showBatchActionDialog('confidence', {lessonId});
+                    }}
                   />
                 </div>
                 
-                {/* Stats Row */}
-                <div className="flex gap-3 text-sm sw-lesson-stats">
-                  <Tag severity="info" value={`${lesson.slices.length} slices`} />
-                  <Tag 
-                    severity={avgConfidence >= 80 ? 'success' : avgConfidence >= 60 ? 'warning' : 'danger'}
-                    value={`${avgConfidence}% avg confidence`}
-                  />
-                </div>
+                {/* Collapsible Content */}
+                {isExpanded && (
+                  <div className="sw-lesson-content">
+                    {/* Progress Bar */}
+                    <div className="sw-lesson-progress">
+                      <ProgressBar 
+                        value={progress} 
+                        showValue 
+                        className="sw-progress sw-progress-thick"
+                      />
+                    </div>
+                    
+                    {/* Stats Row */}
+                    <div className="flex gap-3 text-sm sw-lesson-stats">
+                      <Tag severity="info" value={`${lesson.slices.length} slices`} />
+                      <Tag 
+                        severity={avgConfidence >= 80 ? 'success' : avgConfidence >= 60 ? 'warning' : 'danger'}
+                        value={`${avgConfidence}% avg confidence`}
+                      />
+                    </div>
 
-                {/* Slices Accordion */}
+                    {/* Slices Accordion */}
                 <Accordion
                   multiple
                   activeIndex={activeSlices[lessonId] || []}
@@ -807,16 +1172,41 @@ const CoachPage = () => {
                     );
                   })}
                 </Accordion>
+                  </div>
+                )}
               </Card>
             );
           })}
         </div>
 
-        {/* Summary column */}
-        {summaryVisible && (
-          <div className="col-12 md:col-4">
-            <div className="flex flex-column gap-3">
-              {/* Session Summary Grid */}
+        {/* Sidebar - 4 columns with tabs */}
+        <div className="col-12 lg:col-4">
+          <Card>
+            <div className="flex gap-2 mb-3">
+              <Button
+                label="Summary"
+                size="small"
+                severity={sidebarTab === 'summary' ? 'info' : 'secondary'}
+                outlined={sidebarTab !== 'summary'}
+                onClick={() => setSidebarTab('summary')}
+              />
+              <Button
+                label="Actions"
+                size="small"
+                severity={sidebarTab === 'actions' ? 'info' : 'secondary'}
+                outlined={sidebarTab !== 'actions'}
+                onClick={() => setSidebarTab('actions')}
+              />
+              <Button
+                label="Test Drills"
+                size="small"
+                severity={sidebarTab === 'testdrills' ? 'info' : 'secondary'}
+                outlined={sidebarTab !== 'testdrills'}
+                onClick={() => setSidebarTab('testdrills')}
+              />
+            </div>
+            
+            {sidebarTab === 'summary' && (
               <SessionSummaryGrid
                 summaryData={summaryData}
                 onExport={() => {
@@ -828,8 +1218,8 @@ const CoachPage = () => {
                   console.log('Print session data');
                 }}
               />
-
-              {/* Next Session Actions Card */}
+            )}
+            {sidebarTab === 'actions' && (
               <NextSessionCard
                 teachItems={nextSessionItems.filter(item => item.nextAction === 'Teach').map(item => ({
                   key: `${item.key}-${item.stepNumber}`,
@@ -872,9 +1262,19 @@ const CoachPage = () => {
                   console.log('Clear all');
                 }}
               />
-            </div>
-          </div>
-        )}
+            )}
+            {sidebarTab === 'testdrills' && (
+              <TestDrillsUtilities
+                student={student}
+                allStudents={allStudentsWithStats}
+                testDrills={testDrills}
+                onStartTest={handleStartTest}
+                onPrintChecklist={handlePrintChecklist}
+                onViewPrerequisites={handleViewPrerequisites}
+              />
+            )}
+          </Card>
+        </div>
       </div>
 
       {/* Fixed Action Bar */}
@@ -915,6 +1315,18 @@ const CoachPage = () => {
         }}
       />
 
+      {/* Lesson Editor Dialog */}
+      <LessonEditorDialog
+        visible={showLessonEditor}
+        onHide={() => {
+          setShowLessonEditor(false);
+          setEditingLesson(null);
+        }}
+        lesson={editingLesson}
+        studentId={studentId || ''}
+        onSave={handleSaveLesson}
+      />
+
       {/* Styles for gradient progress + focus mode */}
       <style jsx global>{`
         .sw-progress .p-progressbar {
@@ -927,22 +1339,129 @@ const CoachPage = () => {
           background: linear-gradient(90deg, #ef4444 0%, #f59e0b 40%, #22c55e 100%);
         }
 
-        .sw-dim {
-          filter: blur(3px) brightness(0.75);
-          opacity: 0.6;
-          transition: filter 0.25s ease, opacity 0.25s ease;
+        /* Collapsible lesson styles */
+        .sw-lesson-header {
+          transition: all 0.2s ease;
         }
-        .sw-focus {
-          box-shadow:
-            0 0 0 1px rgba(139, 92, 246, 0.5),
-            0 0 16px rgba(138, 92, 246, 0.14);
-          transform: scale(1.01);
-          transition: transform 0.15s ease, box-shadow 0.25s ease;
-          border-radius: 12px;
+        
+        .sw-lesson-header:hover {
+          background-color: var(--surface-hover);
+          border-radius: 0.5rem;
         }
-      `}</style>
-    </div>
-  );
-};
+        
+        .sw-lesson-content {
+          animation: slideDown 0.3s ease-out;
+        }
+        
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            max-height: 0;
+          }
+          to {
+            opacity: 1;
+            max-height: 1000px;
+          }
+        }
+        
+        /* Dashboard styles */
+        .dashboard-overview .p-card {
+          border: 1px solid var(--surface-border);
+          transition: all 0.2s ease;
+        }
+        
+        .dashboard-overview .p-card:hover {
+          border-color: var(--primary-color);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .student-card {
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .student-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* Sidebar tab styles */
+        .p-button.p-button-outlined {
+          border-width: 2px;
+        }
+        
+        .p-button.p-button-outlined:hover {
+          background-color: var(--primary-color);
+          color: white;
+        }
+
+                 .sw-dim {
+           filter: blur(3px) brightness(0.75);
+           opacity: 0.6;
+           transition: filter 0.25s ease, opacity 0.25s ease;
+         }
+         .sw-focus {
+           box-shadow:
+             0 0 0 1px rgba(139, 92, 246, 0.5),
+             0 0 16px rgba(138, 92, 246, 0.14);
+           transform: scale(1.01);
+           transition: transform 0.15s ease, box-shadow 0.25s ease;
+           border-radius: 12px;
+         }
+         
+         /* Mobile optimizations */
+         @media (max-width: 768px) {
+           .sw-session-header-collapsed {
+             padding: 0.5rem !important;
+           }
+           
+           .sw-session-header .p-card-body {
+             padding: 0.75rem;
+           }
+           
+           .sw-action-bar {
+             position: fixed;
+             bottom: 0;
+             left: 0;
+             right: 0;
+             background: var(--surface-ground);
+             padding: 0.75rem;
+             box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+             z-index: 1000;
+             transition: transform 0.3s ease-in-out;
+           }
+           
+           .sw-action-bar-hidden {
+             transform: translateY(100%);
+           }
+           
+           .page-wrapper {
+             padding-bottom: 80px; /* Space for fixed action bar */
+           }
+           
+           .dashboard-overview .p-card {
+             padding: 0.75rem;
+           }
+           
+           .student-card {
+             margin-bottom: 0.75rem;
+           }
+           
+           .sw-lesson-card {
+             margin-bottom: 0.75rem;
+           }
+           
+           .grid {
+             margin: 0 -0.5rem;
+           }
+           
+           .grid > [class*="col-"] {
+             padding: 0.5rem;
+           }
+         }
+       `}</style>
+     </div>
+   );
+ };
 
 export default CoachPage;

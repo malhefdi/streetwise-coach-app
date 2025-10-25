@@ -31,6 +31,15 @@ export interface IDataService {
   saveTestDrillProgress(studentId: string, progress: StudentTestDrillProgress): Promise<void>;
   recordTestDrillAttempt(studentId: string, attempt: TestDrillAttempt): Promise<void>;
   getTestDrillHistory(studentId: string): Promise<TestDrillAttempt[]>;
+  
+  // Lesson Management
+  updateStudentLesson(studentId: string, lessonId: string, updates: any): Promise<void>;
+  getStudentCustomLessons(studentId: string): Promise<Record<string, any>>;
+  resetStudentLesson(studentId: string, lessonId: string): Promise<void>;
+  
+  // Always-available students persistence
+  markStudentPersistent(studentId: string): Promise<void>;
+  getPersistentStudents(): Promise<string[]>;
 }
 
 // LocalStorage implementation
@@ -42,7 +51,9 @@ class LocalStorageDataService implements IDataService {
     SESSIONS: (studentId: string) => `sw_sessions_${studentId}`,
     ALL_SESSIONS: 'sw_all_sessions',
     TEST_DRILL_PROGRESS: (studentId: string) => `sw_test_drill_progress_${studentId}`,
-    TEST_DRILL_ATTEMPTS: (studentId: string) => `sw_test_drill_attempts_${studentId}`
+    TEST_DRILL_ATTEMPTS: (studentId: string) => `sw_test_drill_attempts_${studentId}`,
+    CUSTOM_LESSONS: (studentId: string) => `sw_custom_lessons_${studentId}`,
+    PERSISTENT_STUDENTS: 'sw_persistent_students'
   };
 
   // Helper methods
@@ -89,6 +100,10 @@ class LocalStorageDataService implements IDataService {
     };
     students.push(newStudent);
     this.writeJSON(this.KEYS.STUDENTS, students);
+    
+    // Auto-mark as persistent
+    await this.markStudentPersistent(newStudent.id);
+    
     return newStudent;
   }
 
@@ -223,6 +238,36 @@ class LocalStorageDataService implements IDataService {
 
   async getTestDrillHistory(studentId: string): Promise<TestDrillAttempt[]> {
     return this.readJSON<TestDrillAttempt[]>(this.KEYS.TEST_DRILL_ATTEMPTS(studentId), []);
+  }
+
+  // Lesson Management
+  async updateStudentLesson(studentId: string, lessonId: string, updates: any): Promise<void> {
+    const customLessons = this.readJSON<Record<string, any>>(this.KEYS.CUSTOM_LESSONS(studentId), {});
+    customLessons[lessonId] = updates;
+    this.writeJSON(this.KEYS.CUSTOM_LESSONS(studentId), customLessons);
+  }
+
+  async getStudentCustomLessons(studentId: string): Promise<Record<string, any>> {
+    return this.readJSON<Record<string, any>>(this.KEYS.CUSTOM_LESSONS(studentId), {});
+  }
+
+  async resetStudentLesson(studentId: string, lessonId: string): Promise<void> {
+    const customLessons = this.readJSON<Record<string, any>>(this.KEYS.CUSTOM_LESSONS(studentId), {});
+    delete customLessons[lessonId];
+    this.writeJSON(this.KEYS.CUSTOM_LESSONS(studentId), customLessons);
+  }
+
+  // Always-available students persistence
+  async markStudentPersistent(studentId: string): Promise<void> {
+    const persistentStudents = this.readJSON<string[]>(this.KEYS.PERSISTENT_STUDENTS, []);
+    if (!persistentStudents.includes(studentId)) {
+      persistentStudents.push(studentId);
+      this.writeJSON(this.KEYS.PERSISTENT_STUDENTS, persistentStudents);
+    }
+  }
+
+  async getPersistentStudents(): Promise<string[]> {
+    return this.readJSON<string[]>(this.KEYS.PERSISTENT_STUDENTS, []);
   }
 }
 

@@ -25,9 +25,11 @@ import StudentHeroCard from './components/StudentHeroCard';
 import OverviewTab from './components/OverviewTab';
 import LessonDataView from './components/LessonDataView';
 import SessionTimeline from './components/SessionTimeline';
+import LessonEditorDialog from './components/LessonEditorDialog';
 import type { Student } from '@/app/types/student.types';
 import type { StudentPlan, StudentProgress } from '@/app/types/plan.types';
 import type { TestDrill, TestDrillAttempt } from '@/app/types/test-drill.types';
+import type { Lesson } from '@/app/data/curriculum';
 
 const gc2CurriculumEnriched = getCurriculum('gc2');
 
@@ -60,6 +62,10 @@ const StudentProfilePage = () => {
   // Test drill states
   const [selectedDrill, setSelectedDrill] = useState<TestDrill | null>(null);
   const [showDrillEvaluator, setShowDrillEvaluator] = useState(false);
+  
+  // Lesson editing states
+  const [showLessonEditor, setShowLessonEditor] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
 
   // ---------- Derived Hooks (SAFE ORDER) ----------
 
@@ -372,6 +378,27 @@ const StudentProfilePage = () => {
     setSelectedDrill(null);
   };
 
+  // Lesson editing handlers
+  const handleEditLesson = (lessonId: string) => {
+    const lesson = gc2CurriculumEnriched?.lessons.find(l => l.id === lessonId);
+    if (lesson) {
+      setEditingLesson(lesson);
+      setShowLessonEditor(true);
+    }
+  };
+
+  const handleSaveLesson = async (updatedLesson: Lesson) => {
+    if (!id || typeof id !== 'string') return;
+    try {
+      await dataService.updateStudentLesson(id, updatedLesson.id, updatedLesson);
+      // Reload data to reflect changes
+      await loadData();
+    } catch (error) {
+      console.error('Error saving lesson:', error);
+      throw error;
+    }
+  };
+
   // ---------- Event Handlers ----------
   const openDrawer = (s: CoachSession) => {
     setSelectedSession(s);
@@ -512,6 +539,7 @@ const StudentProfilePage = () => {
             studentProgress={studentProgress}
             onViewLesson={handleViewLesson}
             onContinueLesson={handleContinueLesson}
+            onEditLesson={handleEditLesson}
           />
         </TabPanel>
 
@@ -550,6 +578,18 @@ const StudentProfilePage = () => {
           setSelectedDrill(null);
         }}
         onComplete={handleDrillComplete}
+      />
+
+      {/* Lesson Editor Dialog */}
+      <LessonEditorDialog
+        visible={showLessonEditor}
+        onHide={() => {
+          setShowLessonEditor(false);
+          setEditingLesson(null);
+        }}
+        lesson={editingLesson}
+        studentId={id as string}
+        onSave={handleSaveLesson}
       />
 
       {/* Drawer */}

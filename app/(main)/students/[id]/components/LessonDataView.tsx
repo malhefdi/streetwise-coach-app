@@ -17,13 +17,15 @@ interface LessonDataViewProps {
   studentProgress: StudentProgress | null;
   onViewLesson: (lessonId: string) => void;
   onContinueLesson: (lessonId: string) => void;
+  onEditLesson: (lessonId: string) => void;
 }
 
 const LessonDataView: React.FC<LessonDataViewProps> = ({
   studentPlan,
   studentProgress,
   onViewLesson,
-  onContinueLesson
+  onContinueLesson,
+  onEditLesson
 }) => {
   const curriculum = getCurriculum('gc2');
 
@@ -212,6 +214,14 @@ const LessonDataView: React.FC<LessonDataViewProps> = ({
               size="small"
               outlined
               onClick={() => onViewLesson(lesson.id)}
+              className="flex-1"
+            />
+            <Button
+              label="Edit"
+              icon="pi pi-pencil"
+              size="small"
+              severity="warning"
+              onClick={() => onEditLesson(lesson.id)}
               className="flex-1"
             />
             {lesson.isInProgress ? (
