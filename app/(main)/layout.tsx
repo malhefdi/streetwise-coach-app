@@ -14,7 +14,7 @@ export const metadata: Metadata = {
         type: 'website',
         title: 'StreetWise Coach',
         url: 'https://www.streetwisebjj.com/',
-        description: 'The ultimate coaching platform for StreetWise BJJ.',
+        description: 'The ultimate coaching platform from StreetWise BJJ.',
         images: ['https://www.primefaces.org/static/social/sakai-react.png'],
         ttl: 604800
     },

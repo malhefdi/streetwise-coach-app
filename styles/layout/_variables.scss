@@ -1,3 +1,57 @@
 /* General */
 $borderRadius:12px;             /* border radius of layout element e.g. card, sidebar */ 
-$transitionDuration:.2s;        /* transition duration of layout elements e.g. sidebar, overlay menus */ 
+$transitionDuration:.2s;        /* transition duration of layout elements e.g. sidebar, overlay menus */
+
+/* Card System Variables */
+$cardRadius: 16px;              /* modern card border radius */
+$cardRadiusSm: 12px;            /* small card border radius */
+$cardRadiusLg: 20px;            /* large card border radius */
+$cardPadding: 1.5rem;           /* standard card padding */
+$cardPaddingSm: 1rem;           /* small card padding */
+$cardPaddingLg: 2rem;           /* large card padding */
+$cardGap: 1rem;                 /* gap between cards */
+$cardGapSm: 0.75rem;            /* small gap between cards */
+$cardGapLg: 1.5rem;             /* large gap between cards */
+
+/* Shadow System */
+$shadowSm: 0 2px 8px rgba(0, 0, 0, 0.15);
+$shadowMd: 0 4px 16px rgba(0, 0, 0, 0.2);
+$shadowLg: 0 8px 32px rgba(0, 0, 0, 0.25);
+$shadowXl: 0 16px 48px rgba(0, 0, 0, 0.3);
+
+/* Typography Scale */
+$fontSizeXs: 0.75rem;           /* 12px */
+$fontSizeSm: 0.875rem;          /* 14px */
+$fontSizeBase: 1rem;            /* 16px */
+$fontSizeLg: 1.125rem;          /* 18px */
+$fontSizeXl: 1.25rem;           /* 20px */
+$fontSize2xl: 1.5rem;           /* 24px */
+$fontSize3xl: 1.875rem;         /* 30px */
+$fontSize4xl: 2.25rem;          /* 36px */
+
+/* Font Weights */
+$fontWeightNormal: 400;
+$fontWeightMedium: 500;
+$fontWeightSemibold: 600;
+$fontWeightBold: 700;
+
+/* Spacing Scale */
+$spacing1: 0.25rem;             /* 4px */
+$spacing2: 0.5rem;              /* 8px */
+$spacing3: 0.75rem;             /* 12px */
+$spacing4: 1rem;                /* 16px */
+$spacing5: 1.25rem;             /* 20px */
+$spacing6: 1.5rem;              /* 24px */
+$spacing8: 2rem;                /* 32px */
+$spacing10: 2.5rem;             /* 40px */
+$spacing12: 3rem;               /* 48px */
+$spacing16: 4rem;               /* 64px */
+$spacing20: 5rem;               /* 80px */
+$spacing24: 6rem;               /* 96px */
+
+/* Breakpoints */
+$breakpointSm: 640px;
+$breakpointMd: 768px;
+$breakpointLg: 1024px;
+$breakpointXl: 1280px;
+$breakpoint2xl: 1536px; 

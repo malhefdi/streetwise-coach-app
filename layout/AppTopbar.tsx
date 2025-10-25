@@ -29,6 +29,18 @@ const AppTopbar = forwardRef<AppTopbarRef>((props, ref) => {
                 <i className="pi pi-bars" />
             </button>
 
+            <button 
+                type="button" 
+                className="p-link layout-topbar-button focus-mode-toggle" 
+                onClick={() => {
+                    const event = new CustomEvent('toggle-focus-mode');
+                    window.dispatchEvent(event);
+                }}
+                title="Toggle Focus Mode"
+            >
+                <i className="pi pi-eye" />
+            </button>
+
             <button ref={topbarmenubuttonRef} type="button" className="p-link layout-topbar-menu-button layout-topbar-button" onClick={showProfileSidebar}>
                 <i className="pi pi-ellipsis-v" />
             </button>

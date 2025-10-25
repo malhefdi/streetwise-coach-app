@@ -1,0 +1,432 @@
+/* ============================================
+   StreetWise Coach - Enhanced Card System
+   ============================================ */
+
+/* Card Base Variables */
+:root {
+  --card-radius: 16px;
+  --card-radius-sm: 12px;
+  --card-radius-lg: 20px;
+  --card-padding: 1.5rem;
+  --card-padding-sm: 1rem;
+  --card-padding-lg: 2rem;
+  --card-gap: 1rem;
+  --card-gap-sm: 0.75rem;
+  --card-gap-lg: 1.5rem;
+  
+  /* Shadows for dark mode optimization */
+  --card-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --card-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.2);
+  --card-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.25);
+  --card-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.3);
+  
+  /* Hover transforms */
+  --card-hover-lift: translateY(-4px);
+  --card-hover-scale: scale(1.02);
+  --card-transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Light theme shadows */
+[data-theme="light"] {
+  --card-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --card-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --card-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+  --card-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+   Base Card Classes
+   ============================================ */
+
+.sw-card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--card-radius);
+  padding: var(--card-padding);
+  box-shadow: var(--card-shadow-sm);
+  transition: var(--card-transition);
+  position: relative;
+  overflow: hidden;
+
+  /* Enhanced focus for accessibility */
+  &:focus-within {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+}
+
+/* Card Variants */
+.sw-card--elevated {
+  box-shadow: var(--card-shadow-md);
+  border: 1px solid var(--surface-border);
+  
+  &:hover {
+    box-shadow: var(--card-shadow-lg);
+    transform: var(--card-hover-lift);
+  }
+}
+
+.sw-card--flat {
+  box-shadow: none;
+  border: 1px solid var(--surface-border);
+}
+
+.sw-card--interactive {
+  cursor: pointer;
+  user-select: none;
+  
+  &:hover {
+    transform: var(--card-hover-lift);
+    box-shadow: var(--card-shadow-lg);
+    border-color: var(--primary-color);
+  }
+  
+  &:active {
+    transform: translateY(-2px) scale(0.98);
+    transition: all 0.1s ease;
+  }
+}
+
+/* Card Sizes */
+.sw-card--sm {
+  padding: var(--card-padding-sm);
+  border-radius: var(--card-radius-sm);
+}
+
+.sw-card--lg {
+  padding: var(--card-padding-lg);
+  border-radius: var(--card-radius-lg);
+}
+
+/* ============================================
+   Specialized Card Types
+   ============================================ */
+
+/* KPI/Stat Cards */
+.sw-card--kpi {
+  @extend .sw-card--elevated;
+  text-align: center;
+  
+  .sw-card__number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-600));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .sw-card__label {
+    font-size: 0.875rem;
+    color: var(--text-color-secondary);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  .sw-card__subtext {
+    font-size: 0.75rem;
+    color: var(--text-color-secondary);
+    margin-top: 0.25rem;
+    opacity: 0.8;
+  }
+}
+
+/* Hero Cards */
+.sw-card--hero {
+  @extend .sw-card--elevated;
+  background: linear-gradient(135deg, var(--surface-card) 0%, var(--surface-100) 100%);
+  border: 1px solid var(--primary-200);
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-color), var(--primary-600));
+    border-radius: var(--card-radius) var(--card-radius) 0 0;
+  }
+}
+
+/* Group Header Cards */
+.sw-card--group-header {
+  background: var(--surface-100);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--card-radius-sm);
+  padding: 0.75rem 1rem;
+  margin-bottom: var(--card-gap-sm);
+  
+  .sw-card__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+  }
+}
+
+/* Timeline/Activity Cards */
+.sw-card--timeline {
+  @extend .sw-card;
+  border-left: 4px solid var(--primary-color);
+  border-radius: 0 var(--card-radius) var(--card-radius) 0;
+  margin-bottom: var(--card-gap);
+  
+  &.sw-card--success {
+    border-left-color: var(--green-500);
+  }
+  
+  &.sw-card--warning {
+    border-left-color: var(--orange-500);
+  }
+  
+  &.sw-card--danger {
+    border-left-color: var(--red-500);
+  }
+}
+
+/* Next Steps Card (White elevated) */
+.sw-card--next-steps {
+  background: #ffffff;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--card-radius);
+  padding: var(--card-padding);
+  box-shadow: var(--card-shadow-lg);
+  color: var(--text-color);
+  
+  .sw-card__title {
+    color: var(--text-color);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  
+  .sw-card__content {
+    color: var(--text-color-secondary);
+    margin-bottom: 1rem;
+  }
+}
+
+/* Ready for Testing Card (Dark) */
+.sw-card--ready-testing {
+  background: var(--surface-100);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--card-radius);
+  padding: var(--card-padding);
+  box-shadow: var(--card-shadow-sm);
+  
+  .sw-card__title {
+    color: var(--green-500);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* ============================================
+   Card Content Elements
+   ============================================ */
+
+.sw-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--card-gap);
+  
+  .sw-card__title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+  }
+  
+  .sw-card__icon {
+    color: var(--primary-color);
+    font-size: 1.5rem;
+  }
+}
+
+.sw-card__content {
+  color: var(--text-color-secondary);
+  line-height: 1.6;
+  
+  p:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.sw-card__footer {
+  margin-top: var(--card-gap);
+  padding-top: var(--card-gap);
+  border-top: 1px solid var(--surface-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* ============================================
+   Progress & Status Elements
+   ============================================ */
+
+.sw-progress {
+  .p-progressbar {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--surface-200);
+    overflow: hidden;
+    
+    .p-progressbar-value {
+      background: linear-gradient(90deg, var(--primary-color), var(--primary-600));
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+  }
+}
+
+.sw-progress--thick {
+  .p-progressbar {
+    height: 12px;
+  }
+}
+
+/* Status Badges */
+.sw-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  
+  &.sw-badge--success {
+    background: var(--green-100);
+    color: var(--green-700);
+    border: 1px solid var(--green-200);
+  }
+  
+  &.sw-badge--warning {
+    background: var(--orange-100);
+    color: var(--orange-700);
+    border: 1px solid var(--orange-200);
+  }
+  
+  &.sw-badge--danger {
+    background: var(--red-100);
+    color: var(--red-700);
+    border: 1px solid var(--red-200);
+  }
+  
+  &.sw-badge--info {
+    background: var(--blue-100);
+    color: var(--blue-700);
+    border: 1px solid var(--blue-200);
+  }
+}
+
+/* ============================================
+   Mobile Responsiveness
+   ============================================ */
+
+@media (max-width: 768px) {
+  :root {
+    --card-padding: 1rem;
+    --card-padding-sm: 0.75rem;
+    --card-padding-lg: 1.5rem;
+    --card-gap: 0.75rem;
+    --card-gap-sm: 0.5rem;
+    --card-gap-lg: 1rem;
+  }
+  
+  .sw-card--kpi {
+    .sw-card__number {
+      font-size: 2rem;
+    }
+  }
+  
+  .sw-card__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .sw-card__footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+}
+
+/* ============================================
+   Dark Mode Specific Enhancements
+   ============================================ */
+
+[data-theme="dark"] {
+  .sw-card--next-steps {
+    background: var(--surface-card);
+    color: var(--text-color);
+    border-color: var(--surface-border);
+  }
+  
+  .sw-badge {
+    &.sw-badge--success {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--green-400);
+      border-color: rgba(34, 197, 94, 0.3);
+    }
+    
+    &.sw-badge--warning {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--orange-400);
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+    
+    &.sw-badge--danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--red-400);
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    
+    &.sw-badge--info {
+      background: rgba(59, 130, 246, 0.2);
+      color: var(--blue-400);
+      border-color: rgba(59, 130, 246, 0.3);
+    }
+  }
+}
+
+/* ============================================
+   Animation Utilities
+   ============================================ */
+
+@keyframes cardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sw-card--animate {
+  animation: cardSlideIn 0.3s ease-out;
+}
+
+/* Staggered animation for card grids */
+.sw-card-grid {
+  .sw-card:nth-child(1) { animation-delay: 0ms; }
+  .sw-card:nth-child(2) { animation-delay: 50ms; }
+  .sw-card:nth-child(3) { animation-delay: 100ms; }
+  .sw-card:nth-child(4) { animation-delay: 150ms; }
+  .sw-card:nth-child(5) { animation-delay: 200ms; }
+  .sw-card:nth-child(6) { animation-delay: 250ms; }
+}

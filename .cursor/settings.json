@@ -1,0 +1,27 @@
+{
+  "mcp.servers": {
+    "context7": {
+      "command": "npx",
+      "args": ["@upstash/context7-mcp"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  },
+  "cursor.cpp.disabledLanguages": [],
+  "cursor.general.enableAutoContext7": true,
+  "cursor.general.context7Triggers": [
+    "react",
+    "nextjs",
+    "typescript",
+    "primereact",
+    "chart.js",
+    "authentication",
+    "middleware",
+    "api routes",
+    "styling",
+    "components"
+  ]
+}
+
+

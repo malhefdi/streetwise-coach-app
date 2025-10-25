@@ -1,112 +1,171 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Timeline } from 'primereact/timeline';
 import { Card } from 'primereact/card';
 import { Badge } from 'primereact/badge';
 import { Rating } from 'primereact/rating';
+import { Accordion, AccordionTab } from 'primereact/accordion';
+import { Divider } from 'primereact/divider';
+import { dataService } from '@/app/services/dataService';
+import { getCurriculum } from '@/app/data/curriculum';
+import type { CoachingSession } from '@/app/types/plan.types';
 
-// NEW - SessionEvent interface
-interface SessionEvent {
-    id: string;
+interface SessionWithStudent extends CoachingSession {
     studentName: string;
-    date: string;
-    duration: number; // minutes
-    techniquesCount: number;
-    curriculum: 'GC2' | 'BBS1';
-    notes?: string;
-    rating?: number; // 1-5
+    studentRank: string;
+    lessonTitle?: string;
 }
 
 const SessionHistoryPage = () => {
-    // NEW - Session data
-    const [sessions, setSessions] = useState<SessionEvent[]>([
-        {
-            id: '1',
-            studentName: 'John Doe',
-            date: '2025-10-08 14:30',
-            duration: 60,
-            techniquesCount: 5,
-            curriculum: 'GC2',
-            rating: 4,
-            notes: 'Great progress on mount escapes'
-        },
-        {
-            id: '2',
-            studentName: 'Jane Smith',
-            date: '2025-10-07 10:00',
-            duration: 45,
-            techniquesCount: 3,
-            curriculum: 'BBS1',
-            rating: 5,
-            notes: 'Excellent retention of guard passing sequences'
-        },
-        {
-            id: '3',
-            studentName: 'Charlie Brown',
-            date: '2025-10-06 18:00',
-            duration: 90,
-            techniquesCount: 8,
-            curriculum: 'GC2',
-            rating: 5,
-            notes: 'Worked on spider guard sweeps. Very intuitive.'
-        },
-        {
-            id: '4',
-            studentName: 'Alice Johnson',
-            date: '2025-10-05 09:00',
-            duration: 60,
-            techniquesCount: 4,
-            curriculum: 'BBS1',
-            notes: 'Needs to improve posture in closed guard.',
-            rating: 3
-        }
-    ]);
+    const [sessionsByStudent, setSessionsByStudent] = useState<Record<string, SessionWithStudent[]>>({});
+    const [loading, setLoading] = useState(true);
+    const curriculum = getCurriculum('gc2');
 
-    // NEW - Timeline item template
-    const customizedContent = (session: SessionEvent) => {
+    useEffect(() => {
+        const loadSessions = async () => {
+            try {
+                const allSessions = await dataService.getAllSessions();
+                const students = await dataService.getStudents();
+                
+                // Enrich sessions with student data and group by student
+                const grouped: Record<string, SessionWithStudent[]> = {};
+                
+                for (const session of allSessions) {
+                    const student = students.find(s => s.id === session.studentId);
+                    if (!student) continue;
+                    
+                    const lesson = curriculum?.lessons.find(l => l.id === session.lessonId);
+                    
+                    const enrichedSession: SessionWithStudent = {
+                        ...session,
+                        studentName: student.name,
+                        studentRank: student.rank,
+                        lessonTitle: lesson ? `L${lesson.lessonNumber}: ${lesson.technique}` : session.lessonId
+                    };
+                    
+                    if (!grouped[student.id]) {
+                        grouped[student.id] = [];
+                    }
+                    grouped[student.id].push(enrichedSession);
+                }
+                
+                // Sort sessions within each student by date (newest first)
+                Object.keys(grouped).forEach(studentId => {
+                    grouped[studentId].sort((a, b) => 
+                        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+                    );
+                });
+                
+                setSessionsByStudent(grouped);
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        loadSessions();
+    }, [curriculum]);
+
+    const sessionCard = (session: SessionWithStudent) => {
+        const duration = session.duration ? Math.round(session.duration / 60) : 0;
+        const completedSteps = session.progress.slices.flatMap(s => s.steps).filter(st => st.completed).length;
+        const totalSteps = session.progress.slices.flatMap(s => s.steps).length;
+        const completion = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+
         return (
-            <Card className="mt-3">
+            <Card key={session.id} className="mb-3 shadow-1">
                 <div className="flex justify-content-between align-items-start">
-                    <div>
-                        <h6 className="mt-0 mb-2">{session.studentName}</h6>
+                    <div className="flex-1">
+                        <h6 className="m-0 mb-2 text-primary">{session.lessonTitle}</h6>
                         <div className="text-sm text-color-secondary mb-2">
                             <i className="pi pi-calendar mr-2"></i>
-                            {new Date(session.date).toLocaleString()}
+                            {new Date(session.startedAt).toLocaleString()}
                         </div>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                            <Badge value={`${session.duration} min`} severity="info" />
-                            <Badge value={session.curriculum} severity="success" />
-                            <Badge value={`${session.techniquesCount} techniques`} />
+                        <div className="flex flex-wrap gap-2">
+                            {duration > 0 && <Badge value={`${duration} min`} severity="info" />}
+                            <Badge 
+                                value={`${completion}%`} 
+                                severity={completion === 100 ? 'success' : completion > 50 ? 'info' : 'warning'} 
+                            />
+                            <Badge value={`${completedSteps}/${totalSteps} steps`} />
                         </div>
-                        {session.notes && <p className="text-sm m-0">{session.notes}</p>}
+                        {session.progress.notes && (
+                            <p className="text-sm mt-2 mb-0 text-color-secondary">
+                                <i className="pi pi-comment mr-1"></i>
+                                {session.progress.notes}
+                            </p>
+                        )}
                     </div>
-                    {session.rating && (
-                        <div className="flex flex-column align-items-end">
-                            <Rating value={session.rating} readOnly cancel={false} />
-                        </div>
-                    )}
                 </div>
             </Card>
         );
     };
 
-    const customizedMarker = () => {
+    if (loading) {
         return (
-            <span className="custom-marker shadow-1" style={{ backgroundColor: '#607D8B' }}>
-                <i className="pi pi-history"></i>
-            </span>
+            <div className="p-5 text-center">
+                <i className="pi pi-spin pi-spinner text-4xl text-primary mb-3"></i>
+                <h3>Loading session history...</h3>
+            </div>
         );
-    };
+    }
+
+    const studentIds = Object.keys(sessionsByStudent);
+    
+    if (studentIds.length === 0) {
+        return (
+            <div className="p-5">
+                <Card className="shadow-2 border-round-2xl">
+                    <div className="text-center p-5">
+                        <i className="pi pi-history text-6xl text-400 mb-3"></i>
+                        <h3 className="text-xl mb-2">No Session History</h3>
+                        <p className="text-color-secondary">
+                            Coaching sessions will appear here once you start training with students.
+                        </p>
+                    </div>
+                </Card>
+            </div>
+        );
+    }
 
     return (
-        <div className="grid">
-            <div className="col-12">
-                <div className="card timeline-demo">
-                    <h5>Session History</h5>
-                    <Timeline value={sessions} align="alternate" className="customized-timeline" marker={customizedMarker} content={customizedContent} />
-                </div>
-            </div>
+        <div className="p-4">
+            <h2 className="text-2xl font-bold mb-4">Session History</h2>
+            <p className="text-color-secondary mb-4">
+                View coaching sessions grouped by student
+            </p>
+
+            <Accordion multiple>
+                {studentIds.map(studentId => {
+                    const studentSessions = sessionsByStudent[studentId];
+                    if (!studentSessions || studentSessions.length === 0) return null;
+                    
+                    const firstSession = studentSessions[0];
+                    
+                    return (
+                        <AccordionTab
+                            key={studentId}
+                            header={
+                                <div className="flex justify-content-between align-items-center w-full pr-3">
+                                    <div>
+                                        <span className="font-bold">{firstSession.studentName}</span>
+                                        <span className="text-sm text-color-secondary ml-2">
+                                            ({firstSession.studentRank})
+                                        </span>
+                                    </div>
+                                    <Badge value={`${studentSessions.length} sessions`} severity="info" />
+                                </div>
+                            }
+                        >
+                            <div className="pt-3">
+                                {studentSessions.map(session => sessionCard(session))}
+                            </div>
+                        </AccordionTab>
+                    );
+                })}
+            </Accordion>
         </div>
     );
 };

@@ -5,8 +5,29 @@
     justify-content: space-between;
     padding: 7rem 2rem 2rem 4rem;
     transition: margin-left $transitionDuration;
+    background-color: var(--surface-ground);
+    color: var(--text-color);
 }
 
 .layout-main {
     flex: 1 1 auto;
+    background-color: var(--surface-ground);
+    color: var(--text-color);
+}
+
+/* Page wrapper for consistent backgrounds */
+.page-wrapper {
+    background-color: var(--surface-ground);
+    min-height: 100vh;
+    color: var(--text-color);
+}
+
+/* Content sections */
+.content-section {
+    background-color: var(--surface-card);
+    border-radius: $cardRadius;
+    padding: $cardPadding;
+    margin-bottom: $cardGap;
+    box-shadow: $shadowSm;
+    border: 1px solid var(--surface-border);
 }

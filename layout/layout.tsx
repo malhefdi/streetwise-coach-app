@@ -9,16 +9,25 @@ import AppFooter from './AppFooter';
 import AppSidebar from './AppSidebar';
 import AppTopbar from './AppTopbar';
 import AppConfig from './AppConfig';
+import FocusModeIndicator from './components/FocusModeIndicator';
 import { LayoutContext } from './context/layoutcontext';
 import { PrimeReactContext } from 'primereact/api';
 import { ChildContainerProps, LayoutState, AppTopbarRef } from '@/types';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { useMobileOptimizations } from './hooks/useMobileOptimizations';
 
 const Layout = ({ children }: ChildContainerProps) => {
     const { layoutConfig, layoutState, setLayoutState } = useContext(LayoutContext);
     const { setRipple } = useContext(PrimeReactContext);
     const topbarRef = useRef<AppTopbarRef>(null);
     const sidebarRef = useRef<HTMLDivElement>(null);
+    
+    // Mobile optimizations
+    const { isFocusMode, toggleFocusMode, showFocusIndicator } = useMobileOptimizations({
+        autoHideDelay: 2000,
+        scrollThreshold: 50,
+        enableFocusMode: true
+    });
     const [bindMenuOutsideClickListener, unbindMenuOutsideClickListener] = useEventListener({
         type: 'click',
         listener: (event) => {
@@ -135,6 +144,7 @@ const Layout = ({ children }: ChildContainerProps) => {
                 </div>
                 <AppConfig />
                 <div className="layout-mask"></div>
+                <FocusModeIndicator visible={showFocusIndicator} isFocusMode={isFocusMode} />
             </div>
         </React.Fragment>
     );

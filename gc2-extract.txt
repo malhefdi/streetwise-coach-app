@@ -1,0 +1,36 @@
+gc2: {
+    id: 'gc2',
+    name: 'Gracie Combatives 2.0',
+    description: 'Fundamental self-defense techniques for beginners',
+    totalLessons: 36,
+    lessons: [
+      {
+            "id": "gc2-l1",
+            "lessonNumber": 1,
+            "technique": "Trap & Roll Escape",
+            "position": "Mount",
+            "overview": "The Trap & Roll Escape is a simple, reliable way to reverse the single worst position in a fight.",
+            "mindsetMinute": "Because being mounted is so dangerous, we present several techniques in this course to prevent it from happening in the first place. View the Trap & Roll Escape as an emergency tool of last resort.",
+            "streetTip": "While concrete will give you the best traction while standing, it may be the most unforgiving terrain to fight on. Be aware of what parts of your body will impact the ground.",
+            "slices": [
+                  {
+                        "id": "gc2-l1-s1",
+                        "sliceNumber": 1,
+                        "title": "Standard Variation",
+                        "indicator": "Opponent grabs your chest or throat with one or both hands",
+                        "essentialDetail": "Trapping everything all at once",
+                        "mostCommonMistake": "Rolling sideways instead of bridging upwards",
+                        "badGuyReminder": "Keep hands on chest for this variation",
+                        "safetyTip": "Top person tuck shoulder",
+                        "corePrinciples": [
+                              "Isolation (19)",
+                              "Kuzushi (11)"
+                        ],
+                        "drillOrders": "Mount start, 1 rep, reverse roles",
+                        "isBonusSlice": false,
+                        "steps": [
+                              {
+                                    "id": "gc2-l1-s1-st1",
+                                    "stepNumber": 1,
+                                    "description": "Recognize: Opponent grabs your chest or throat with one or both hands"
+                              }

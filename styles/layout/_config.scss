@@ -20,6 +20,11 @@
     z-index: 999;
     box-shadow: -.25rem 0 1rem rgba(0,0,0,.15);
 
+    // Hide on mobile devices - settings moved to sidebar menu
+    @media (max-width: 991px) {
+        display: none;
+    }
+
 
     &.config-link {
         font-size: 1rem;

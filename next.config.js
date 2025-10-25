@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {reactStrictMode: false,
+const nextConfig = {
+    reactStrictMode: false,
     eslint: {
         ignoreDuringBuilds: true
     },
@@ -10,7 +11,7 @@ const nextConfig = {reactStrictMode: false,
                 destination: '/dashboard',
                 permanent: true
             }
-];
+        ];
     }
 }; 
 module.exports = nextConfig

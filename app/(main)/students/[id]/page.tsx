@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
@@ -12,21 +12,24 @@ import { Chart } from 'primereact/chart';
 import { MultiSelect } from 'primereact/multiselect';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Sidebar } from 'primereact/sidebar';
+import { Dialog } from 'primereact/dialog';
+import { Panel } from 'primereact/panel';
 import Link from 'next/link';
+import { getCurriculum } from '@/app/data/curriculum';
+import { dataService } from '@/app/services/dataService';
+import PlanBuilder from './components/PlanBuilder';
+import PlanProgress from './components/PlanProgress';
+import TestDrillTracker from './components/TestDrillTracker';
+import DrillEvaluator from './components/DrillEvaluator';
+import StudentHeroCard from './components/StudentHeroCard';
+import OverviewTab from './components/OverviewTab';
+import LessonDataView from './components/LessonDataView';
+import SessionTimeline from './components/SessionTimeline';
+import type { Student } from '@/app/types/student.types';
+import type { StudentPlan, StudentProgress } from '@/app/types/plan.types';
+import type { TestDrill, TestDrillAttempt } from '@/app/types/test-drill.types';
 
-
-
-// ---------- Types ----------
-interface Student {
-  id: string;
-  name: string;
-  rank: string;
-  sessions: number;
-  plan?: string[];
-  progress?: Record<string, number>;
-  feedback?: { date: string; message: string; tag?: string }[];
-  avatar?: string;
-}
+const gc2CurriculumEnriched = getCurriculum('gc2');
 
 interface CoachSession {
   timestamp: string;
@@ -38,90 +41,294 @@ interface CoachSession {
 // ---------- Component ----------
 const StudentProfilePage = () => {
   const { id } = useParams();
+  const router = useRouter();
 
   // ---------- States ----------
   const [student, setStudent] = useState<Student | null>(null);
-  const [allLessons] = useState(gc2CurriculumEnriched.lessons);
+  const [allLessons] = useState(gc2CurriculumEnriched?.lessons || []);
   const [newFeedback, setNewFeedback] = useState('');
   const [sessions, setSessions] = useState<CoachSession[]>([]);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [selectedSession, setSelectedSession] = useState<CoachSession | null>(null);
+  
+  // Plan-related states
+  const [studentPlan, setStudentPlan] = useState<StudentPlan | null>(null);
+  const [studentProgress, setStudentProgress] = useState<StudentProgress | null>(null);
+  const [showPlanBuilder, setShowPlanBuilder] = useState(false);
+  const [planLoading, setPlanLoading] = useState(false);
+  
+  // Test drill states
+  const [selectedDrill, setSelectedDrill] = useState<TestDrill | null>(null);
+  const [showDrillEvaluator, setShowDrillEvaluator] = useState(false);
 
   // ---------- Derived Hooks (SAFE ORDER) ----------
 
-  // Principle Heat (run always)
-  const principleHeat = useMemo(() => {
-    const counts = new Map<string, number>();
-    allLessons.forEach((l) =>
-      l.slices?.forEach((s) =>
-        (s.corePrinciples || []).forEach((p) => {
-          const name = p.split(' (')[0];
-          counts.set(name, (counts.get(name) || 0) + 1);
-        })
-      )
-    );
-    const entries = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  // Principle Exposure based on actual student progress
+  const principleExposure = useMemo(() => {
+    if (!studentProgress || !studentPlan || !gc2CurriculumEnriched) {
+      return { labels: [], data: [] };
+    }
+
+    const exposureCounts = new Map<string, number>();
+    
+    // Get lessons from student's plan
+    const planLessons = studentPlan.lessonIds
+      .map(lessonId => gc2CurriculumEnriched.lessons.find(l => l.id === lessonId))
+      .filter((l): l is typeof gc2CurriculumEnriched.lessons[0] => l !== undefined);
+
+    // Count principle exposure from completed slices
+    planLessons.forEach(lesson => {
+      const lessonProgress = studentProgress.lessons[lesson.id];
+      if (!lessonProgress) return;
+
+      lesson.slices.forEach((slice, sliceIdx) => {
+        const sliceProgress = lessonProgress.slices[sliceIdx];
+        if (!sliceProgress) return;
+
+        // Check if slice is completed (all steps completed)
+        const allStepsCompleted = sliceProgress.steps.every(st => st.completed);
+        
+        if (allStepsCompleted && slice.corePrinciples) {
+          slice.corePrinciples.forEach(principle => {
+            const name = principle.split(' (')[0];
+            exposureCounts.set(name, (exposureCounts.get(name) || 0) + 1);
+          });
+        }
+      });
+    });
+
+    const entries = Array.from(exposureCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8); // Top 8 principles for readability
+
     return {
       labels: entries.map(([name]) => name),
       data: entries.map(([, count]) => count),
     };
-  }, [allLessons]);
+  }, [studentProgress, studentPlan]);
 
   const radarData = {
-    labels: principleHeat.labels,
+    labels: principleExposure.labels.length > 0 ? principleExposure.labels : ['No Data'],
     datasets: [
       {
         label: 'Principle Exposure',
-        data: principleHeat.data,
-        backgroundColor: 'rgba(34,197,94,0.25)',
-        borderColor: '#22C55E',
-        pointBackgroundColor: '#22C55E',
+        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+        borderColor: 'rgba(34, 197, 94, 1)',
+        pointBackgroundColor: 'rgba(34, 197, 94, 1)',
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: 'rgba(34, 197, 94, 1)',
+        data: principleExposure.data.length > 0 ? principleExposure.data : [0],
       },
     ],
   };
 
-  // ---------- Load Student + Sessions ----------
-  useEffect(() => {
-    const data = localStorage.getItem('sw_students');
-    if (data) {
-      const all = JSON.parse(data) as Student[];
-      const found = all.find((s) => s.id === id);
-      setStudent(found || null);
+  const radarOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+    },
+    scales: {
+      r: {
+        beginAtZero: true,
+        max: Math.max(...principleExposure.data, 1),
+        ticks: {
+          stepSize: 1,
+        },
+      },
+    },
+  };
+
+  // Confidence Trend from actual session data
+  const confidenceTrendData = useMemo(() => {
+    if (!studentProgress || !studentPlan) {
+      return {
+        labels: ['No Data'],
+        datasets: [{
+          label: 'Confidence',
+          borderColor: '#42A5F5',
+          fill: false,
+          tension: 0.4,
+          data: [0],
+        }]
+      };
     }
 
-    const sessionData = localStorage.getItem('coachSession_v2');
-    if (sessionData) {
-      const parsed = JSON.parse(sessionData);
-      const sessionEntries: CoachSession[] = Object.entries(parsed).map(([lessonId, steps]: any) => ({
-        timestamp: new Date().toLocaleString(),
-        lessonId,
-        completed: steps.filter((s: any) => s.completed).length / (steps.length || 1),
-        notes: steps.map((s: any) => s.notes).filter(Boolean).join('; '),
-      }));
-      setSessions(sessionEntries);
+    // Get all steps from all lessons with timestamps
+    const allSteps: { confidence: number; timestamp: string }[] = [];
+    
+    Object.values(studentProgress.lessons).forEach(lessonProg => {
+      lessonProg.slices.forEach(sliceProg => {
+        sliceProg.steps.forEach(step => {
+          if (step.completed && lessonProg.startedAt) {
+            allSteps.push({
+              confidence: step.confidence,
+              timestamp: lessonProg.startedAt
+            });
+          }
+        });
+      });
+    });
+
+    if (allSteps.length === 0) {
+      return {
+        labels: ['No Sessions'],
+        datasets: [{
+          label: 'Confidence',
+          borderColor: '#42A5F5',
+          fill: false,
+          tension: 0.4,
+          data: [50],
+        }]
+      };
     }
+
+    // Sort by timestamp
+    allSteps.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    // Group by session (same timestamp) and calculate average
+    const sessionMap = new Map<string, number[]>();
+    allSteps.forEach(step => {
+      const date = new Date(step.timestamp).toLocaleDateString();
+      if (!sessionMap.has(date)) {
+        sessionMap.set(date, []);
+      }
+      sessionMap.get(date)!.push(step.confidence);
+    });
+
+    const sessions = Array.from(sessionMap.entries()).map(([date, confidences]) => ({
+      date,
+      avgConfidence: confidences.reduce((sum, c) => sum + c, 0) / confidences.length
+    }));
+
+    return {
+      labels: sessions.map(s => s.date),
+      datasets: [{
+        label: 'Average Confidence',
+        borderColor: '#42A5F5',
+        fill: false,
+        tension: 0.4,
+        data: sessions.map(s => Math.round(s.avgConfidence)),
+      }]
+    };
+  }, [studentProgress, studentPlan]);
+
+  // Completion breakdown data
+  const completionBreakdownData = useMemo(() => {
+    if (!studentProgress || !studentPlan) {
+      return {
+        labels: ['No Data'],
+        datasets: [{
+          data: [1],
+          backgroundColor: ['#E5E7EB'],
+        }]
+      };
+    }
+
+    let completed = 0;
+    let inProgress = 0;
+    let notStarted = 0;
+
+    studentPlan.lessonIds.forEach(lessonId => {
+      const lessonProgress = studentProgress.lessons[lessonId];
+      if (lessonProgress?.completedAt) {
+        completed++;
+      } else if (lessonProgress?.startedAt) {
+        inProgress++;
+      } else {
+        notStarted++;
+      }
+    });
+
+    return {
+      labels: ['Completed', 'In Progress', 'Not Started'],
+      datasets: [{
+        data: [completed, inProgress, notStarted],
+        backgroundColor: ['#22C55E', '#F59E0B', '#E5E7EB'],
+      }]
+    };
+  }, [studentProgress, studentPlan]);
+
+  const analyticsData = {
+    confidenceTrend: confidenceTrendData,
+    completionData: completionBreakdownData,
+  };
+
+  const sortedSessions = [...sessions].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  // ---------- Load Student + Sessions + Plan ----------
+  useEffect(() => {
+    const loadData = async () => {
+      if (!id || typeof id !== 'string') return;
+      
+      // Load student
+      const studentData = await dataService.getStudent(id);
+      setStudent(studentData);
+      
+      // Load plan if exists
+      if (studentData?.planId) {
+        setPlanLoading(true);
+        try {
+          const plan = await dataService.getStudentPlan(id);
+          setStudentPlan(plan);
+          
+          const progress = await dataService.getStudentProgress(id);
+          setStudentProgress(progress);
+        } catch (error) {
+          console.error('Error loading plan:', error);
+        } finally {
+          setPlanLoading(false);
+        }
+      }
+      
+      // Load sessions
+      const sessionData = localStorage.getItem('coachSession_v2');
+      if (sessionData) {
+        const parsed = JSON.parse(sessionData);
+        const sessionEntries: CoachSession[] = Object.entries(parsed).map(([lessonId, steps]: any) => ({
+          timestamp: new Date().toLocaleString(),
+          lessonId,
+          completed: steps.filter((s: any) => s.completed).length / (steps.length || 1),
+          notes: steps.map((s: any) => s.notes).filter(Boolean).join('; '),
+        }));
+        setSessions(sessionEntries);
+      }
+    };
+    
+    loadData();
   }, [id]);
 
   // ---------- Save Student ----------
-  const saveStudent = (updated: Student) => {
-    const data = localStorage.getItem('sw_students');
-    if (!data) return;
-    const all = JSON.parse(data) as Student[];
-    const idx = all.findIndex((s) => s.id === updated.id);
-    if (idx !== -1) all[idx] = updated;
-    localStorage.setItem('sw_students', JSON.stringify(all));
-    setStudent(updated);
+  const saveStudent = async (updates: Partial<Student>) => {
+    if (!student) return;
+    try {
+      const updated = await dataService.updateStudent(student.id, updates);
+      setStudent(updated);
+    } catch (error) {
+      console.error('Error saving student:', error);
+    }
   };
 
-  // ---------- Handlers ----------
-  const openSessionDetail = (s: CoachSession) => {
-    setSelectedSession(s);
-    setDrawerVisible(true);
-  };
-
-  const closeDrawer = () => {
-    setDrawerVisible(false);
-    setSelectedSession(null);
+  // ---------- Plan Handlers ----------
+  const handlePlanSaved = async () => {
+    setShowPlanBuilder(false);
+    // Reload plan and progress
+    if (id && typeof id === 'string') {
+      try {
+        const plan = await dataService.getStudentPlan(id);
+        setStudentPlan(plan);
+        
+        const progress = await dataService.getStudentProgress(id);
+        setStudentProgress(progress);
+      } catch (error) {
+        console.error('Error reloading plan:', error);
+      }
+    }
   };
 
   const handlePlanChange = (val: string[]) => {
@@ -143,44 +350,44 @@ const StudentProfilePage = () => {
     setNewFeedback('');
   };
 
-  // ---------- Derived Data ----------
-  const avgProgress =
-    Object.values(student?.progress || {}).reduce((a, b) => a + b, 0) /
-    (Object.keys(student?.progress || {}).length || 1);
-
-  const analyticsData = {
-    confidenceTrend: {
-      labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-      datasets: [
-        {
-          label: 'Confidence',
-          borderColor: '#42A5F5',
-          fill: false,
-          tension: 0.4,
-          data: [40, 55, 70, 82],
-        },
-      ],
-    },
-    completionData: {
-      labels: ['Completed', 'Remaining'],
-      datasets: [
-        {
-          data: [avgProgress, 100 - avgProgress],
-          backgroundColor: ['#22C55E', '#4B5563'],
-        },
-      ],
-    },
+  const handleDrillSelect = (drill: TestDrill) => {
+    setSelectedDrill(drill);
+    setShowDrillEvaluator(true);
   };
 
-  const sortedSessions = [...sessions].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
+  const reloadStudentProgress = async () => {
+    if (!id || typeof id !== 'string') return;
+    try {
+      const progress = await dataService.getStudentProgress(id);
+      setStudentProgress(progress);
+    } catch (error) {
+      console.error('Error reloading progress:', error);
+    }
+  };
+
+  const handleDrillComplete = (attempt: TestDrillAttempt) => {
+    // Refresh student progress to reflect any changes
+    reloadStudentProgress();
+    setShowDrillEvaluator(false);
+    setSelectedDrill(null);
+  };
+
+  // ---------- Event Handlers ----------
+  const openDrawer = (s: CoachSession) => {
+    setSelectedSession(s);
+    setDrawerVisible(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerVisible(false);
+    setSelectedSession(null);
+  };
 
   // ---------- Drawer Content ----------
   const renderSessionDetail = () => {
     if (!selectedSession) return null;
     const lessonData = allLessons.find(
-      (l) => `gc2-l${l.lesson}` === selectedSession.lessonId
+      (l) => `gc2-l${l.lessonNumber}` === selectedSession.lessonId
     );
 
     return (
@@ -188,154 +395,162 @@ const StudentProfilePage = () => {
         <h2 className="text-xl font-bold mb-2">
           {lessonData?.technique || selectedSession.lessonId}
         </h2>
-        <p className="text-sm text-color-secondary mb-3">{selectedSession.timestamp}</p>
-        <ProgressBar
-          value={(selectedSession.completed || 0) * 100}
-          className="mb-4"
-          pt={{
-            value: {
-              style: { background: 'linear-gradient(90deg,#ef4444,#22c55e)' },
-            },
-          }}
-        />
-        {lessonData ? (
-          lessonData.slices.map((slice, i) => (
-            <Card key={i} className="mb-3 surface-ground border-round-lg p-3">
-              <h4 className="text-md font-semibold mb-2">
-                Slice {i + 1}: {slice.title}
-              </h4>
-              <ul className="pl-3">
-                {slice.steps?.map((step, j) => (
-                  <li key={j} className="text-sm mb-1">
-                    {step.description}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ))
-        ) : (
-          <p>No slice data found for this lesson.</p>
-        )}
+        <p className="text-color-secondary mb-3">
+          {lessonData?.overview || 'No overview available'}
+        </p>
+        <div className="mb-3">
+          <strong>Confidence:</strong> {Math.round((selectedSession.completed || 0) * 100)}%
+        </div>
         {selectedSession.notes && (
-          <>
-            <Divider />
-            <p className="text-sm italic opacity-70">
-              Notes: {selectedSession.notes}
-            </p>
-          </>
+          <div>
+            <strong>Notes:</strong>
+            <p className="text-color-secondary mt-1">{selectedSession.notes}</p>
+          </div>
         )}
       </div>
     );
   };
 
+  // ---------- Tab Navigation Handlers ----------
+  const handleStartCoaching = () => {
+    if (student) {
+      router.push(`/coach?student=${student.id}`);
+    }
+  };
+
+  const handleViewLesson = (lessonId: string) => {
+    // Navigate to lesson detail or open in modal
+    console.log('View lesson:', lessonId);
+  };
+
+  const handleContinueLesson = (lessonId: string) => {
+    // Start coaching session with specific lesson
+    if (student) {
+      router.push(`/coach?student=${student.id}&lesson=${lessonId}`);
+    }
+  };
+
+  const handleViewSession = useCallback((session: CoachSession) => {
+    openDrawer(session);
+  }, []);
+
   // ---------- Render ----------
-  if (!student)
+  if (!student) {
     return (
-      <div className="p-5 text-center">
-        <h3>Student not found</h3>
-        <Link href="/students">
-          <Button label="Back to Students" className="mt-3" />
-        </Link>
+      <div className="flex justify-content-center align-items-center h-screen">
+        <div className="text-center">
+          <i className="pi pi-spin pi-spinner text-4xl text-primary mb-3" />
+          <p>Loading student profile...</p>
+        </div>
       </div>
     );
+  }
 
   return (
-    <div className="p-4">
-      <Link href="/students">
-        <Button label="Back to Roster" icon="pi pi-arrow-left" className="p-button-text mb-3" />
-      </Link>
+    <div className="page-wrapper p-4">
+      {/* Hero Card */}
+      <StudentHeroCard
+        student={student}
+        studentPlan={studentPlan}
+        studentProgress={studentProgress}
+        onEditPlan={() => setShowPlanBuilder(true)}
+        onStartCoaching={handleStartCoaching}
+      />
 
-      {/* Header */}
-      <Card className="shadow-2 border-round-2xl mb-4">
-        <div className="flex align-items-center gap-3">
-          <img
-            src={student.avatar || '/layout/images/avatar.png'}
-            alt={student.name}
-            className="border-circle"
-            width="72"
-            height="72"
+      {/* Enhanced TabView */}
+      <TabView pt={{panelContainer: {className: 'p-p-0 p-mt-3'}}}>
+        {/* Overview Tab */}
+        <TabPanel header="Overview" leftIcon="pi pi-home">
+          <OverviewTab
+            student={student}
+            studentPlan={studentPlan}
+            studentProgress={studentProgress}
+            sessions={sortedSessions}
+            onStartCoaching={handleStartCoaching}
+            onViewTestPrep={() => {/* Switch to test prep tab */}}
+            onViewLessonPlan={() => {/* Switch to lesson plan tab */}}
           />
-          <div>
-            <h2 className="m-0 text-2xl font-bold">{student.name}</h2>
-            <p className="m-0 text-sm text-color-secondary">{student.rank}</p>
-          </div>
-        </div>
-        <Divider />
-        <p>Total Sessions: {student.sessions}</p>
-        <ProgressBar
-          value={avgProgress || 0}
-          showValue
-          className="sw-progress"
-          pt={{
-            value: {
-              style: {
-                background: 'linear-gradient(90deg, var(--red-400), var(--green-400))',
-              },
-            },
-          }}
-        />
-      </Card>
+        </TabPanel>
 
-      {/* Tabs */}
-      <TabView>
-        <TabPanel header="Performance Analytics" leftIcon="pi pi-chart-line mr-2">
+        {/* Performance Analytics Tab */}
+        <TabPanel header="Performance" leftIcon="pi pi-chart-line">
           <div className="grid">
-            <div className="col-12 md:col-6">
-              <Card className="shadow-2 border-round-2xl h-full">
-                <h3 className="text-lg mb-3">Confidence Trend</h3>
+            <div className="col-12">
+              <Panel header="Confidence Trend" toggleable className="sw-card sw-card--elevated mb-4">
                 <Chart type="line" data={analyticsData.confidenceTrend} />
-              </Card>
+              </Panel>
             </div>
             <div className="col-12 md:col-6">
-              <Card className="shadow-2 border-round-2xl h-full">
-                <h3 className="text-lg mb-3">Completion Breakdown</h3>
+              <Panel header="Completion Breakdown" toggleable className="sw-card sw-card--elevated">
                 <Chart type="doughnut" data={analyticsData.completionData} />
-              </Card>
+              </Panel>
+            </div>
+            <div className="col-12 md:col-6">
+              <Panel header="Principle Exposure" toggleable className="sw-card sw-card--elevated">
+                <div style={{ height: '300px' }}>
+                  <Chart type="radar" data={radarData} options={radarOptions} />
+                </div>
+              </Panel>
             </div>
           </div>
         </TabPanel>
 
-        <TabPanel header="Principle Heat Wheel" leftIcon="pi pi-compass mr-2">
-          <Card className="shadow-2 border-round-2xl">
-            <h3 className="text-lg mb-3">Principle Exposure Radar</h3>
-            <Chart type="radar" data={radarData} />
-          </Card>
+        {/* Test Preparation Tab */}
+        <TabPanel header="Test Prep" leftIcon="pi pi-flag">
+          <TestDrillTracker
+            studentId={id as string}
+            studentPlan={studentPlan}
+            studentProgress={studentProgress}
+            onDrillSelect={handleDrillSelect}
+          />
         </TabPanel>
 
-        <TabPanel header="Session Timeline" leftIcon="pi pi-calendar mr-2">
-          <Card className="shadow-2 border-round-2xl">
-            <h3 className="text-lg mb-3">Training Sessions</h3>
-            {sortedSessions.length ? (
-              <ul className="pl-0 m-0 list-none">
-                {sortedSessions.map((s, i) => (
-                  <li
-                    key={i}
-                    className="mb-3 p-3 border-round-lg surface-overlay cursor-pointer hover:surface-hover transition-all"
-                    onClick={() => openSessionDetail(s)}
-                  >
-                    <div className="flex justify-content-between mb-1">
-                      <span className="font-semibold">{s.lessonId}</span>
-                      <Tag
-                        value={`${Math.round((s.completed || 0) * 100)}%`}
-                        severity={
-                          (s.completed || 0) > 0.9
-                            ? 'success'
-                            : (s.completed || 0) > 0.5
-                            ? 'info'
-                            : 'warning'
-                        }
-                      />
-                    </div>
-                    <small className="text-color-secondary">{s.timestamp}</small>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-color-secondary">No recorded sessions yet.</p>
-            )}
-          </Card>
+        {/* Lesson Plan Tab */}
+        <TabPanel header="Lesson Plan" leftIcon="pi pi-list">
+          <LessonDataView
+            studentPlan={studentPlan}
+            studentProgress={studentProgress}
+            onViewLesson={handleViewLesson}
+            onContinueLesson={handleContinueLesson}
+          />
+        </TabPanel>
+
+        {/* Sessions Timeline Tab */}
+        <TabPanel header="Sessions" leftIcon="pi pi-calendar">
+          <SessionTimeline
+            sessions={sortedSessions}
+            onViewSession={handleViewSession}
+          />
         </TabPanel>
       </TabView>
+
+      {/* Plan Builder Dialog */}
+      <Dialog
+        visible={showPlanBuilder}
+        onHide={() => setShowPlanBuilder(false)}
+        style={{ width: '90vw', maxWidth: '1200px' }}
+        maximizable
+        modal
+        header={studentPlan ? 'Edit Lesson Plan' : 'Build Lesson Plan'}
+      >
+        <PlanBuilder
+          studentId={typeof id === 'string' ? id : ''}
+          existingPlan={studentPlan}
+          onSave={handlePlanSaved}
+        />
+      </Dialog>
+
+      {/* Drill Evaluator Dialog */}
+      <DrillEvaluator
+        visible={showDrillEvaluator}
+        drill={selectedDrill}
+        studentId={id as string}
+        onClose={() => {
+          setShowDrillEvaluator(false);
+          setSelectedDrill(null);
+        }}
+        onComplete={handleDrillComplete}
+      />
 
       {/* Drawer */}
       <Sidebar
@@ -352,6 +567,16 @@ const StudentProfilePage = () => {
         .sw-progress .p-progressbar {
           height: 10px;
           border-radius: 999px;
+        }
+        .lesson-dataview .p-dataview-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+          gap: 1rem;
+        }
+        @media (max-width: 768px) {
+          .lesson-dataview .p-dataview-grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </div>

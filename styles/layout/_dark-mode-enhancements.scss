@@ -1,0 +1,435 @@
+/* ============================================
+   StreetWise Coach - Dark Mode Enhancements
+   ============================================ */
+
+/* Dark Mode Theme Detection */
+[data-theme="dark"] {
+  /* Enhanced surface colors for better contrast */
+  --surface-ground: #0f1419;
+  --surface-section: #1a1f24;
+  --surface-card: #1e2328;
+  --surface-overlay: #24292e;
+  --surface-border: #30363d;
+  --surface-hover: #21262d;
+  
+  /* Enhanced text colors */
+  --text-color: #f0f6fc;
+  --text-color-secondary: #8b949e;
+  --text-color-tertiary: #6e7681;
+  
+  /* Primary color adjustments for dark mode */
+  --primary-color: #58a6ff;
+  --primary-50: #0d1117;
+  --primary-100: #161b22;
+  --primary-200: #21262d;
+  --primary-300: #30363d;
+  --primary-400: #484f58;
+  --primary-500: #58a6ff;
+  --primary-600: #79c0ff;
+  --primary-700: #a5d6ff;
+  --primary-800: #cae8ff;
+  --primary-900: #f0f8ff;
+  
+  /* Success colors for dark mode */
+  --green-50: #0d1117;
+  --green-100: #0d2818;
+  --green-200: #0f5132;
+  --green-300: #166534;
+  --green-400: #16a34a;
+  --green-500: #22c55e;
+  --green-600: #4ade80;
+  --green-700: #86efac;
+  --green-800: #bbf7d0;
+  --green-900: #dcfce7;
+  
+  /* Warning colors for dark mode */
+  --orange-50: #0d1117;
+  --orange-100: #2d1b0d;
+  --orange-200: #4a2c0f;
+  --orange-300: #7c2d12;
+  --orange-400: #ea580c;
+  --orange-500: #f59e0b;
+  --orange-600: #fbbf24;
+  --orange-700: #fcd34d;
+  --orange-800: #fde68a;
+  --orange-900: #fef3c7;
+  
+  /* Danger colors for dark mode */
+  --red-50: #0d1117;
+  --red-100: #2d1b1b;
+  --red-200: #4a1e1e;
+  --red-300: #7f1d1d;
+  --red-400: #dc2626;
+  --red-500: #ef4444;
+  --red-600: #f87171;
+  --red-700: #fca5a5;
+  --red-800: #fecaca;
+  --red-900: #fee2e2;
+  
+  /* Blue colors for dark mode */
+  --blue-50: #0d1117;
+  --blue-100: #0d1b2d;
+  --blue-200: #1e3a8a;
+  --blue-300: #1e40af;
+  --blue-400: #2563eb;
+  --blue-500: #3b82f6;
+  --blue-600: #60a5fa;
+  --blue-700: #93c5fd;
+  --blue-800: #bfdbfe;
+  --blue-900: #dbeafe;
+}
+
+/* ============================================
+   Page Background Fixes
+   ============================================ */
+
+.layout-main-container {
+  background-color: var(--surface-ground) !important;
+  min-height: 100vh;
+}
+
+.layout-main {
+  background-color: var(--surface-ground);
+  color: var(--text-color);
+}
+
+/* Ensure proper background hierarchy */
+.surface-ground {
+  background-color: var(--surface-ground) !important;
+}
+
+.surface-section {
+  background-color: var(--surface-section) !important;
+}
+
+.surface-card {
+  background-color: var(--surface-card) !important;
+}
+
+/* ============================================
+   Enhanced Component Styling for Dark Mode
+   ============================================ */
+
+/* PrimeReact Panel enhancements */
+.p-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  
+  .p-panel-header {
+    background: var(--surface-100);
+    border-bottom: 1px solid var(--surface-border);
+    border-radius: 16px 16px 0 0;
+    padding: 1rem 1.5rem;
+    
+    .p-panel-title {
+      color: var(--text-color);
+      font-weight: 600;
+      font-size: 1.125rem;
+    }
+  }
+  
+  .p-panel-content {
+    background: var(--surface-card);
+    border-radius: 0 0 16px 16px;
+    padding: 1.5rem;
+  }
+}
+
+/* PrimeReact Card enhancements */
+.p-card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: var(--text-color);
+  
+  .p-card-body {
+    padding: 1.5rem;
+  }
+  
+  .p-card-title {
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .p-card-subtitle {
+    color: var(--text-color-secondary);
+    font-weight: 400;
+    margin-bottom: 0.5rem;
+  }
+  
+  .p-card-content {
+    color: var(--text-color-secondary);
+    line-height: 1.6;
+  }
+}
+
+/* PrimeReact TabView enhancements */
+.p-tabview {
+  .p-tabview-nav {
+    background: var(--surface-100);
+    border-bottom: 1px solid var(--surface-border);
+    
+    .p-tabview-nav-link {
+      background: transparent;
+      border: none;
+      color: var(--text-color-secondary);
+      padding: 1rem 1.5rem;
+      border-radius: 0;
+      transition: all 0.2s ease;
+      
+      &:hover {
+        background: var(--surface-hover);
+        color: var(--text-color);
+      }
+      
+      &.p-highlight {
+        background: var(--surface-card);
+        color: var(--primary-color);
+        border-bottom: 2px solid var(--primary-color);
+      }
+    }
+  }
+  
+  .p-tabview-panels {
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    padding: 1.5rem;
+  }
+}
+
+/* PrimeReact Accordion enhancements */
+.p-accordion {
+  .p-accordion-tab {
+    border: 1px solid var(--surface-border);
+    border-radius: 12px;
+    margin-bottom: 0.5rem;
+    
+    .p-accordion-header {
+      .p-accordion-header-link {
+        background: var(--surface-100);
+        border: none;
+        color: var(--text-color);
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        
+        &:hover {
+          background: var(--surface-hover);
+        }
+        
+        &.p-highlight {
+          background: var(--surface-card);
+          border-bottom: 1px solid var(--surface-border);
+          border-radius: 12px 12px 0 0;
+        }
+      }
+    }
+    
+    .p-accordion-content {
+      background: var(--surface-card);
+      border: none;
+      border-radius: 0 0 12px 12px;
+      padding: 1.5rem;
+    }
+  }
+}
+
+/* PrimeReact DataTable enhancements */
+.p-datatable {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 16px;
+  overflow: hidden;
+  
+  .p-datatable-header {
+    background: var(--surface-100);
+    border-bottom: 1px solid var(--surface-border);
+    padding: 1rem 1.5rem;
+  }
+  
+  .p-datatable-thead > tr > th {
+    background: var(--surface-100);
+    border-bottom: 1px solid var(--surface-border);
+    color: var(--text-color);
+    font-weight: 600;
+    padding: 1rem 1.5rem;
+  }
+  
+  .p-datatable-tbody > tr {
+    background: var(--surface-card);
+    border-bottom: 1px solid var(--surface-border);
+    
+    &:hover {
+      background: var(--surface-hover);
+    }
+    
+    > td {
+      color: var(--text-color);
+      padding: 1rem 1.5rem;
+    }
+  }
+}
+
+/* PrimeReact ProgressBar enhancements */
+.p-progressbar {
+  background: var(--surface-200);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+  
+  .p-progressbar-value {
+    background: linear-gradient(90deg, var(--primary-color), var(--primary-600));
+    border-radius: 999px;
+    transition: width 0.3s ease;
+  }
+}
+
+/* PrimeReact Button enhancements */
+.p-button {
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  &.p-button-success {
+    background: var(--green-500);
+    border-color: var(--green-500);
+    
+    &:hover {
+      background: var(--green-600);
+      border-color: var(--green-600);
+    }
+  }
+  
+  &.p-button-warning {
+    background: var(--orange-500);
+    border-color: var(--orange-500);
+    
+    &:hover {
+      background: var(--orange-600);
+      border-color: var(--orange-600);
+    }
+  }
+  
+  &.p-button-danger {
+    background: var(--red-500);
+    border-color: var(--red-500);
+    
+    &:hover {
+      background: var(--red-600);
+      border-color: var(--red-600);
+    }
+  }
+}
+
+/* PrimeReact Tag enhancements */
+.p-tag {
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  
+  &.p-tag-success {
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--green-400);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
+  
+  &.p-tag-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--orange-400);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+  
+  &.p-tag-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--red-400);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+}
+
+/* ============================================
+   Chart Enhancements for Dark Mode
+   ============================================ */
+
+/* Chart.js dark mode styling */
+.chart-container {
+  background: var(--surface-card);
+  border-radius: 16px;
+  padding: 1rem;
+  
+  canvas {
+    border-radius: 12px;
+  }
+}
+
+/* ============================================
+   Mobile Dark Mode Optimizations
+   ============================================ */
+
+@media (max-width: 768px) {
+  [data-theme="dark"] {
+    /* Reduce shadows on mobile for better performance */
+    --card-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.2);
+    --card-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25);
+    --card-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.3);
+    --card-shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+  
+  .p-panel .p-panel-header,
+  .p-panel .p-panel-content {
+    padding: 1rem;
+  }
+  
+  .p-card .p-card-body {
+    padding: 1rem;
+  }
+  
+  .p-tabview-panels {
+    padding: 1rem;
+  }
+}
+
+/* ============================================
+   Accessibility Enhancements
+   ============================================ */
+
+/* Focus indicators for dark mode */
+*:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  [data-theme="dark"] {
+    --surface-border: #ffffff;
+    --text-color-secondary: #ffffff;
+    --text-color-tertiary: #ffffff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

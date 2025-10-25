@@ -59,6 +59,25 @@ const AppConfig = (props: AppConfigProps) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [layoutConfig.scale]);
 
+    // Listen for custom events from sidebar menu
+    useEffect(() => {
+        const handleThemeConfigOpen = () => {
+            setLayoutState((prevState: LayoutState) => ({ ...prevState, configSidebarVisible: true }));
+        };
+
+        const handleLayoutConfigOpen = () => {
+            setLayoutState((prevState: LayoutState) => ({ ...prevState, configSidebarVisible: true }));
+        };
+
+        window.addEventListener('open-theme-config', handleThemeConfigOpen);
+        window.addEventListener('open-layout-config', handleLayoutConfigOpen);
+
+        return () => {
+            window.removeEventListener('open-theme-config', handleThemeConfigOpen);
+            window.removeEventListener('open-layout-config', handleLayoutConfigOpen);
+        };
+    }, [setLayoutState]);
+
     return (
         <>
             <button className="layout-config-button config-link" type="button" onClick={onConfigButtonClick}>

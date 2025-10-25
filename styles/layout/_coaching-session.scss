@@ -1,0 +1,658 @@
+/* Coaching Session Specific Styles */
+
+/* Session Header */
+.sw-session-header {
+  background: var(--surface-card);
+  border-bottom: 2px solid var(--primary-color);
+  box-shadow: var(--card-shadow-md);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin-bottom: 1rem;
+  
+  .sw-student-info {
+    .sw-student-avatar {
+      border: 2px solid var(--primary-color);
+    }
+    
+    .sw-student-name {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-color);
+      margin: 0;
+    }
+    
+    .sw-student-details {
+      font-size: 0.875rem;
+      color: var(--text-color-secondary);
+    }
+  }
+  
+  .sw-session-stats {
+    .sw-progress-circular {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: conic-gradient(
+        var(--primary-color) 0deg,
+        var(--primary-color) calc(var(--progress) * 3.6deg),
+        var(--surface-border) calc(var(--progress) * 3.6deg),
+        var(--surface-border) 360deg
+      );
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      
+      &::before {
+        content: '';
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        background: var(--surface-card);
+        border-radius: 50%;
+      }
+      
+      .sw-progress-text {
+        position: relative;
+        z-index: 1;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-color);
+      }
+    }
+    
+    .sw-timer {
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+  }
+  
+  .sw-session-actions {
+    .sw-primary-actions {
+      .p-button {
+        min-width: 120px;
+      }
+    }
+    
+    .sw-secondary-actions {
+      .p-button {
+        min-width: 100px;
+      }
+    }
+  }
+}
+
+/* Lesson Cards */
+.sw-lesson-card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 16px;
+  transition: all 0.2s ease;
+  margin-bottom: 1rem;
+  
+  &:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--card-shadow-lg);
+    transform: translateY(-2px);
+  }
+  
+  .sw-lesson-header {
+    .sw-lesson-avatar {
+      background: var(--primary-color);
+      color: var(--primary-color-text);
+      font-weight: 600;
+    }
+    
+    .sw-lesson-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--text-color);
+      margin: 0;
+    }
+    
+    .sw-lesson-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-color-secondary);
+    }
+    
+    .sw-batch-actions {
+      .p-button {
+        width: 32px;
+        height: 32px;
+      }
+    }
+  }
+  
+  .sw-lesson-progress {
+    .p-progressbar {
+      height: 8px;
+      border-radius: 4px;
+      background: var(--surface-200);
+      
+      .p-progressbar-value {
+        background: linear-gradient(90deg, var(--primary-color), var(--primary-400));
+        border-radius: 4px;
+      }
+    }
+  }
+  
+  .sw-lesson-stats {
+    .p-tag {
+      font-size: 0.75rem;
+    }
+  }
+}
+
+/* Step Cards */
+.sw-step-card {
+  background: var(--surface-100);
+  border: 1px solid var(--surface-border);
+  border-left: 4px solid transparent;
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+  transition: all 0.2s ease;
+  
+  &.importance-critical {
+    border-left-color: var(--red-500);
+    background: color-mix(in srgb, var(--red-500) 5%, var(--surface-100));
+  }
+  
+  &.importance-important {
+    border-left-color: var(--orange-500);
+    background: color-mix(in srgb, var(--orange-500) 5%, var(--surface-100));
+  }
+  
+  &.completed {
+    opacity: 0.7;
+    background: var(--surface-50);
+    
+    .sw-step-description {
+      text-decoration: line-through;
+    }
+  }
+  
+  .sw-step-header {
+    .sw-step-checkbox {
+      .p-checkbox {
+        .p-checkbox-box {
+          width: 20px;
+          height: 20px;
+        }
+      }
+    }
+    
+    .sw-step-description {
+      font-weight: 500;
+      color: var(--text-color);
+    }
+    
+    .sw-step-tags {
+      .p-tag {
+        font-size: 0.75rem;
+      }
+    }
+  }
+  
+  .sw-step-controls {
+    .sw-confidence-control {
+      .p-slider {
+        .p-slider-handle {
+          width: 20px;
+          height: 20px;
+        }
+      }
+    }
+    
+    .sw-importance-control {
+      .p-selectbutton {
+        .p-button {
+          font-size: 0.75rem;
+          padding: 0.5rem 0.75rem;
+        }
+      }
+    }
+    
+    .sw-notes-control {
+      .p-inputtextarea {
+        font-size: 0.875rem;
+      }
+    }
+  }
+}
+
+/* Session Summary Grid */
+.sw-summary-grid {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow-md);
+  
+  .sw-summary-header {
+    border-bottom: 1px solid var(--surface-border);
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    
+    .sw-summary-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-color);
+      margin: 0;
+    }
+    
+    .sw-summary-actions {
+      .p-button {
+        font-size: 0.875rem;
+      }
+    }
+  }
+  
+  .sw-summary-table {
+    .p-datatable {
+      .p-datatable-tbody {
+        tr {
+          &.bg-green-900 {
+            background: color-mix(in srgb, var(--green-500) 10%, transparent) !important;
+          }
+          
+          &.bg-orange-900 {
+            background: color-mix(in srgb, var(--orange-500) 10%, transparent) !important;
+          }
+          
+          &.bg-red-900 {
+            background: color-mix(in srgb, var(--red-500) 10%, transparent) !important;
+          }
+          
+          &:hover {
+            background: var(--surface-hover) !important;
+          }
+        }
+      }
+    }
+    
+    .sw-status-icon {
+      font-size: 1.25rem;
+      
+      &.pi-check-circle {
+        color: var(--green-500);
+      }
+      
+      &.pi-clock {
+        color: var(--orange-500);
+      }
+      
+      &.pi-times-circle {
+        color: var(--red-500);
+      }
+    }
+    
+    .sw-mini-progress {
+      .p-progressbar {
+        height: 6px;
+        border-radius: 3px;
+        background: var(--surface-200);
+        
+        .p-progressbar-value {
+          border-radius: 3px;
+        }
+      }
+    }
+  }
+}
+
+/* Next Session Actions Card */
+.sw-next-actions-card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow-md);
+  
+  .sw-actions-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+    
+    .pi-flag {
+      color: var(--primary-color);
+    }
+  }
+  
+  .sw-action-section {
+    margin-bottom: 1.5rem;
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    .sw-section-header {
+      .sw-section-avatar {
+        &.bg-blue-500 {
+          background: var(--blue-500);
+        }
+        
+        &.bg-orange-500 {
+          background: var(--orange-500);
+        }
+        
+        &.bg-red-500 {
+          background: var(--red-500);
+        }
+      }
+      
+      .sw-section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-color);
+        margin: 0;
+      }
+    }
+    
+    .sw-action-items {
+      .sw-action-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem;
+        border-radius: 8px;
+        transition: background-color 0.2s ease;
+        
+        &:hover {
+          background: var(--surface-hover);
+        }
+        
+        .sw-action-checkbox {
+          .p-checkbox {
+            .p-checkbox-box {
+              width: 18px;
+              height: 18px;
+            }
+          }
+        }
+        
+        .sw-action-text {
+          font-size: 0.875rem;
+          color: var(--text-color);
+        }
+      }
+    }
+  }
+  
+  .sw-actions-footer {
+    border-top: 1px solid var(--surface-border);
+    padding-top: 1rem;
+    margin-top: 1rem;
+    
+    .p-button {
+      font-size: 0.875rem;
+    }
+  }
+}
+
+/* Fixed Action Bar */
+.sw-action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface-card);
+  border-top: 1px solid var(--surface-border);
+  padding: 1rem;
+  z-index: 1000;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+  
+  .sw-session-info {
+    .sw-timer-tag {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    
+    .sw-steps-count {
+      font-size: 0.875rem;
+      color: var(--text-color-secondary);
+    }
+  }
+  
+  .sw-primary-actions {
+    .p-button {
+      min-width: 100px;
+      font-weight: 600;
+    }
+  }
+}
+
+/* Batch Action Toolbar */
+.sw-batch-toolbar {
+  background: var(--surface-100);
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  
+  .sw-batch-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+  }
+  
+  .sw-batch-actions {
+    .p-button {
+      font-size: 0.875rem;
+    }
+  }
+  
+  .sw-selection-info {
+    font-size: 0.875rem;
+    color: var(--text-color-secondary);
+  }
+}
+
+/* Test Override Dialog */
+.sw-override-dialog {
+  .sw-override-warning {
+    .p-message {
+      margin-bottom: 1rem;
+    }
+  }
+  
+  .sw-override-reason {
+    .p-inputtextarea {
+      min-height: 100px;
+    }
+  }
+  
+  .sw-override-actions {
+    .p-button {
+      min-width: 120px;
+    }
+  }
+}
+
+/* Progress Enhancements */
+.sw-progress {
+  &.sw-progress-thick {
+    .p-progressbar {
+      height: 12px;
+      border-radius: 6px;
+      background: var(--surface-200);
+      
+      .p-progressbar-value {
+        border-radius: 6px;
+        background: linear-gradient(90deg, var(--primary-color), var(--primary-400));
+      }
+    }
+  }
+  
+  &.sw-progress-mini {
+    .p-progressbar {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--surface-200);
+      
+      .p-progressbar-value {
+        border-radius: 2px;
+      }
+    }
+  }
+}
+
+/* Collapsible Panels */
+.sw-collapsible-panel {
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+  overflow: hidden;
+  
+  &.sw-collapsed {
+    max-height: 0;
+    opacity: 0;
+  }
+  
+  &.sw-expanded {
+    max-height: 500px;
+    opacity: 1;
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 639px) {
+  .sw-session-header {
+    .sw-session-stats {
+      .sw-progress-circular {
+        display: none;
+      }
+    }
+    
+    .sw-session-actions {
+      .flex {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.5rem;
+      }
+      
+      .p-button {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  }
+  
+  .sw-action-bar {
+    .flex {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .sw-primary-actions {
+      width: 100%;
+      
+      .flex {
+        justify-content: center;
+      }
+    }
+  }
+  
+  .sw-lesson-card {
+    .sw-lesson-header {
+      .flex {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 0.5rem;
+      }
+      
+      .sw-batch-actions {
+        align-self: flex-end;
+      }
+    }
+  }
+  
+  .sw-summary-grid {
+    .sw-summary-table {
+      .p-datatable {
+        font-size: 0.75rem;
+        
+        .p-datatable-thead > tr > th,
+        .p-datatable-tbody > tr > td {
+          padding: 0.5rem;
+        }
+      }
+    }
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .sw-summary-grid {
+    .sw-summary-table {
+      .p-datatable {
+        font-size: 0.875rem;
+      }
+    }
+  }
+}
+
+@media (min-width: 768px) {
+  .sw-action-bar {
+    left: 250px; /* Account for sidebar */
+  }
+}
+
+/* Focus Mode */
+.sw-focus {
+  .sw-lesson-card:not(.sw-focused) {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+  
+  .sw-focused {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px var(--primary-200);
+  }
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sw-animate-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .sw-lesson-card,
+  .sw-step-card,
+  .sw-collapsible-panel {
+    transition: none;
+  }
+  
+  .sw-animate-in {
+    animation: none;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .sw-lesson-card,
+  .sw-step-card,
+  .sw-summary-grid,
+  .sw-next-actions-card {
+    border-width: 2px;
+  }
+  
+  .sw-step-card {
+    &.importance-critical {
+      border-left-width: 6px;
+    }
+    
+    &.importance-important {
+      border-left-width: 6px;
+    }
+  }
+}
