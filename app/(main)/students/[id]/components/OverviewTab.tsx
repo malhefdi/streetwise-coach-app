@@ -26,6 +26,7 @@ interface OverviewTabProps {
   studentPlan: StudentPlan | null;
   studentProgress: StudentProgress | null;
   sessions: CoachSession[];
+  curriculumId?: string;
   onStartCoaching: () => void;
   onViewTestPrep: () => void;
   onViewLessonPlan: () => void;
@@ -36,11 +37,12 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   studentPlan,
   studentProgress,
   sessions,
+  curriculumId = 'gc2',
   onStartCoaching,
   onViewTestPrep,
   onViewLessonPlan
 }) => {
-  const curriculum = getCurriculum('gc2');
+  const curriculum = getCurriculum(curriculumId);
 
   // Calculate quick stats
   const quickStats = useMemo(() => {

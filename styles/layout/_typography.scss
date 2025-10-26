@@ -1,9 +1,14 @@
+/* ============================================
+   StreetWise Coach - Typography System
+   ============================================ */
+
+/* Heading Hierarchy - Using Design Tokens */
 h1, h2, h3, h4, h5, h6 {
-    margin: 1.5rem 0 1rem 0;
+    margin: var(--sw-space-lg) 0 var(--sw-space-md) 0;
     font-family: inherit;
-    font-weight: 500;
-    line-height: 1.2;
-    color: var(--surface-900);
+    font-weight: var(--sw-font-semibold);
+    line-height: var(--sw-leading-tight);
+    color: var(--sw-text-high);
 
     &:first-child {
         margin-top: 0;
@@ -11,27 +16,33 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 h1 {
-    font-size: 2.5rem;
+    font-size: var(--sw-text-4xl); /* 36px - Page titles */
+    font-weight: var(--sw-font-bold);
 }
 
 h2 {
-    font-size: 2rem;
+    font-size: var(--sw-text-3xl); /* 30px - Section titles */
+    font-weight: var(--sw-font-semibold);
 }
 
 h3 {
-    font-size: 1.75rem;
+    font-size: var(--sw-text-2xl); /* 24px - Subsection titles */
+    font-weight: var(--sw-font-semibold);
 }
 
 h4 {
-    font-size: 1.5rem;
+    font-size: var(--sw-text-xl); /* 20px - Card titles */
+    font-weight: var(--sw-font-medium);
 }
 
 h5 {
-    font-size: 1.25rem;
+    font-size: var(--sw-text-lg); /* 18px - Small headings */
+    font-weight: var(--sw-font-medium);
 }
 
 h6 {
-    font-size: 1rem;
+    font-size: var(--sw-text-base); /* 16px - Labels */
+    font-weight: var(--sw-font-medium);
 }
 
 mark {
@@ -53,11 +64,52 @@ hr {
     margin: 1rem 0;
 }
 
+/* Body Text */
 p {
-    margin: 0 0 1rem 0;
-    line-height: 1.5;
+    margin: 0 0 var(--sw-space-md) 0;
+    font-size: var(--sw-text-sm); /* 14px - Body text */
+    font-weight: var(--sw-font-normal);
+    line-height: var(--sw-leading-relaxed); /* 1.6 */
+    color: var(--sw-text-med);
 
     &:last-child {
         margin-bottom: 0;
     }
+}
+
+/* Text Emphasis Utilities */
+.text-high {
+    color: var(--sw-text-high);
+    font-weight: var(--sw-font-semibold);
+}
+
+.text-med {
+    color: var(--sw-text-med);
+    font-weight: var(--sw-font-normal);
+}
+
+.text-low {
+    color: var(--sw-text-low);
+    font-weight: var(--sw-font-normal);
+}
+
+.text-muted {
+    color: var(--sw-text-muted);
+    font-weight: var(--sw-font-normal);
+}
+
+/* Section Text (16px/medium) */
+.section-text {
+    font-size: var(--sw-text-base);
+    font-weight: var(--sw-font-medium);
+    line-height: var(--sw-leading-relaxed);
+    color: var(--sw-text-med);
+}
+
+/* Title Text (24px/semibold) */
+.title-text {
+    font-size: var(--sw-text-2xl);
+    font-weight: var(--sw-font-semibold);
+    line-height: var(--sw-leading-tight);
+    color: var(--sw-text-high);
 }

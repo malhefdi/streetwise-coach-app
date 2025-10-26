@@ -5,16 +5,10 @@ import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import { InputTextarea } from 'primereact/inputtextarea';
-import { Slider } from 'primereact/slider';
 import { Checkbox } from 'primereact/checkbox';
 import { Tag } from 'primereact/tag';
 import { ProgressBar } from 'primereact/progressbar';
-import { Divider } from 'primereact/divider';
 import { Toast } from 'primereact/toast';
-import { DataTable } from 'primereact/datatable';
-import { Column } from 'primereact/column';
-import { Panel } from 'primereact/panel';
-import { Dropdown } from 'primereact/dropdown';
 import { getCurriculum } from '@/app/data/curriculum';
 import { resolveTestDrillReferences } from '@/app/services/testDrillService';
 import { dataService } from '@/app/services/dataService';
@@ -45,66 +39,78 @@ const extractCombinationTitle = (combination?: string, index: number = 0): strin
   return cleanText;
 };
 
-// Inline Deduction Component
-const InlineDeduction: React.FC<{
-  sliceId: string;
-  onAddDeduction: (sliceId: string, reason: string, points: number) => void;
-}> = ({ sliceId, onAddDeduction }) => {
-  const [showDeduction, setShowDeduction] = useState(false);
-  const [deductionReason, setDeductionReason] = useState('');
-  
-  const handleAddDeduction = () => {
-    if (deductionReason.trim()) {
-      onAddDeduction(sliceId, deductionReason.trim(), 1); // Default 1 point
-      setShowDeduction(false);
-      setDeductionReason('');
-    }
-  };
-  
-  const handleCancel = () => {
-    setShowDeduction(false);
-    setDeductionReason('');
-  };
-  
+// Mobile-optimized slice row component
+const MobileSliceRow: React.FC<{
+  slice: any;
+  onToggle: (sliceId: string) => void;
+  onAddDeduction: (sliceId: string) => void;
+  onAddComment: (sliceId: string) => void;
+}> = ({ slice, onToggle, onAddDeduction, onAddComment }) => {
+  if (slice.isGroupHeader) {
+    return (
+      <div className="sw-mobile-group-header">
+        <div className="sw-group-title">
+          {slice.groupHeader}
+        </div>
+      </div>
+    );
+  }
+
+  const hasNotes = slice.notes && slice.notes.trim().length > 0;
+
   return (
-    <div className="deduction-controls">
-      {!showDeduction ? (
-        <Button
-          icon="pi pi-minus"
-          size="small"
-          severity="danger"
-          text
-          onClick={() => setShowDeduction(true)}
-          tooltip="Add 1-point deduction"
-        />
-      ) : (
-        <div className="deduction-input">
-          <InputTextarea
-            value={deductionReason}
-            onChange={(e) => setDeductionReason(e.target.value)}
-            placeholder="Deduction reason..."
-            rows={2}
-            className="w-full"
-            autoFocus
+    <div 
+      className={`sw-mobile-slice-row ${slice.tested ? 'tested' : ''} ${slice.hasDeductions ? 'has-deductions' : ''} ${hasNotes ? 'has-notes' : ''}`}
+    >
+      <div className="sw-slice-main">
+        <div className="sw-slice-checkbox">
+          <Checkbox 
+            checked={slice.tested || false}
+            onChange={() => onToggle(slice.id)}
+            className="sw-large-checkbox"
           />
-          <div className="flex gap-1 mt-1">
-            <Button
-              label="Add (-1)"
-              size="small"
-              severity="danger"
-              onClick={handleAddDeduction}
-              disabled={!deductionReason.trim()}
-            />
-            <Button
-              label="Cancel"
-              size="small"
-              severity="secondary"
-              text
-              onClick={handleCancel}
-            />
+        </div>
+        
+        <div className="sw-slice-info" onClick={() => onToggle(slice.id)}>
+          <div className="sw-slice-title">
+            {slice.isCombination ? '++' : ''} {slice.sliceTitle}
+          </div>
+          <div className="sw-slice-meta">
+            L{slice.lessonNumber} • S{slice.sliceNumber}
+            {slice.combinationText && (
+              <span className="sw-combination-text"> • {slice.combinationText}</span>
+            )}
           </div>
         </div>
-      )}
+        
+        <div className="sw-slice-actions">
+          {slice.hasDeductions && (
+            <Tag severity="danger" value="-" className="sw-deduction-badge" />
+          )}
+          <Button
+            icon="pi pi-minus"
+            size="small"
+            severity="danger"
+            text
+            className="sw-action-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddDeduction(slice.id);
+            }}
+          />
+          <Button
+            icon="pi pi-comment"
+            size="small"
+            severity={hasNotes ? "warning" : "info"}
+            text
+            className={`sw-action-btn ${hasNotes ? 'sw-note-btn--active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddComment(slice.id);
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 };
@@ -122,6 +128,10 @@ const DrillEvaluator: React.FC<DrillEvaluatorProps> = ({
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isOvertime, setIsOvertime] = useState(false);
   const [overtimeSeconds, setOvertimeSeconds] = useState(0);
+  
+  // Use refs to avoid recreating interval on every state change
+  const timeRemainingRef = useRef(0);
+  const isOvertimeRef = useRef(false);
   const [currentScore, setCurrentScore] = useState(100);
   const [evaluatorNotes, setEvaluatorNotes] = useState('');
   const [deductions, setDeductions] = useState<Array<{
@@ -141,6 +151,9 @@ const DrillEvaluator: React.FC<DrillEvaluatorProps> = ({
     hasDeductions: boolean;
     isCombination: boolean;
     combinationText?: string;
+    isGroupHeader?: boolean;
+    groupHeader?: string;
+    notes?: string; // Add slice-specific notes
   }>>([]);
   
   // For freestyle drill (Drill 5)
@@ -150,6 +163,17 @@ const DrillEvaluator: React.FC<DrillEvaluatorProps> = ({
     conviction: 50,
     reflexes: 50
   });
+
+  // Mobile-specific state
+  const [showDescription, setShowDescription] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [showDeductions, setShowDeductions] = useState(false);
+  const [currentDeductionSlice, setCurrentDeductionSlice] = useState<string | null>(null);
+  const [deductionReason, setDeductionReason] = useState('');
+  
+  // Slice-specific notes state
+  const [currentNoteSlice, setCurrentNoteSlice] = useState<string | null>(null);
+  const [sliceNoteText, setSliceNoteText] = useState('');
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const toast = useRef<Toast>(null);
@@ -269,10 +293,19 @@ const DrillEvaluator: React.FC<DrillEvaluatorProps> = ({
     }
   }, [drill?.isFreestyle, resolvedSlices]);
 
+  // Update refs when state changes
+  useEffect(() => {
+    timeRemainingRef.current = timeRemaining;
+  }, [timeRemaining]);
+
+  useEffect(() => {
+    isOvertimeRef.current = isOvertime;
+  }, [isOvertime]);
+
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
-        if (timeRemaining > 0) {
+        if (timeRemainingRef.current > 0) {
           setTimeRemaining(prev => {
             const newTime = prev - 1;
             
@@ -289,7 +322,7 @@ const DrillEvaluator: React.FC<DrillEvaluatorProps> = ({
             
             return newTime;
           });
-        } else if (isOvertime) {
+        } else if (isOvertimeRef.current) {
           // Overtime counting
           setOvertimeSeconds(prev => prev + 1);
         }
@@ -306,22 +339,13 @@ const DrillEvaluator: React.FC<DrillEvaluatorProps> = ({
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, timeRemaining, isOvertime]);
+  }, [isRunning]);
 
   const showWarningAlert = () => {
     toast.current?.show({
       severity: 'warn',
       summary: '30 Seconds Remaining!',
       detail: 'Time is almost up. Complete your techniques quickly.'
-    });
-  };
-
-  const handleTimeUp = () => {
-    setIsRunning(false);
-    toast.current?.show({
-      severity: 'warn',
-      summary: 'Time Up!',
-      detail: 'The test time has expired. Overtime has started.'
     });
   };
 
@@ -341,13 +365,20 @@ const DrillEvaluator: React.FC<DrillEvaluatorProps> = ({
     );
   };
 
-  const handleAddDeduction = (sliceId: string, reason: string, points: number = 1) => {
-    const slice = testedSlices.find(s => s.id === sliceId);
+  const handleAddDeduction = (sliceId: string) => {
+    setCurrentDeductionSlice(sliceId);
+    setDeductionReason('');
+  };
+
+  const confirmDeduction = () => {
+    if (!currentDeductionSlice || !deductionReason.trim()) return;
+    
+    const slice = testedSlices.find(s => s.id === currentDeductionSlice);
     if (!slice) return;
     
     const newDeduction = {
-      reason,
-      points,
+      reason: deductionReason.trim(),
+      points: 1, // Default 1 point deduction
       sliceReference: {
         lessonNumber: slice.lessonNumber,
         sliceTitle: slice.sliceTitle
@@ -356,74 +387,72 @@ const DrillEvaluator: React.FC<DrillEvaluatorProps> = ({
     };
     
     setDeductions(prev => [...prev, newDeduction]);
-    setCurrentScore(prev => Math.max(prev - points, 0));
+    setCurrentScore(prev => Math.max(prev - 1, 0));
     
     // Mark slice as having deductions
     setTestedSlices(prev => 
       prev.map(s => 
-        s.id === sliceId ? { ...s, hasDeductions: true } : s
+        s.id === currentDeductionSlice ? { ...s, hasDeductions: true } : s
+      )
+    );
+    
+    setCurrentDeductionSlice(null);
+    setDeductionReason('');
+    
+    toast.current?.show({
+      severity: 'info',
+      summary: 'Deduction Added',
+      detail: `-1 point: ${deductionReason.trim()}`
+    });
+  };
+
+  const cancelDeduction = () => {
+    setCurrentDeductionSlice(null);
+    setDeductionReason('');
+  };
+
+  const handleAddSliceNote = (sliceId: string) => {
+    const slice = testedSlices.find(s => s.id === sliceId);
+    setCurrentNoteSlice(sliceId);
+    setSliceNoteText(slice?.notes || '');
+  };
+
+  const confirmSliceNote = () => {
+    if (!currentNoteSlice) return;
+    
+    setTestedSlices(prev => 
+      prev.map(s => 
+        s.id === currentNoteSlice ? { ...s, notes: sliceNoteText.trim() } : s
+      )
+    );
+    
+    setCurrentNoteSlice(null);
+    setSliceNoteText('');
+    
+    toast.current?.show({
+      severity: 'info',
+      summary: 'Note Added',
+      detail: 'Slice-specific note saved'
+    });
+  };
+
+  const cancelSliceNote = () => {
+    setCurrentNoteSlice(null);
+    setSliceNoteText('');
+  };
+
+  const markAllTested = () => {
+    setTestedSlices(prev => 
+      prev.map(slice => 
+        slice.isGroupHeader ? slice : { ...slice, tested: true }
       )
     );
   };
 
-  const addDeduction = () => {
-    const reason = prompt('Enter deduction reason:');
-    if (!reason) return;
-    
-    const points = parseInt(prompt('Enter points to deduct (1-10):') || '1');
-    const validPoints = Math.min(Math.max(points, 1), 10);
-    
-    // For drills 1-4, allow selecting which slice
-    let sliceReference = undefined;
-    if (!drill?.isFreestyle && testedSlices.length > 0) {
-      const sliceOptions = testedSlices.map((slice, index) => ({
-        label: `L${slice.lessonNumber}: ${slice.sliceTitle}`,
-        value: { lessonNumber: slice.lessonNumber, sliceTitle: slice.sliceTitle }
-      }));
-      
-      // Simple prompt for slice selection (could be enhanced with a proper dialog)
-      const sliceIndex = prompt(`Select slice (0-${sliceOptions.length - 1}):`);
-      if (sliceIndex !== null && !isNaN(parseInt(sliceIndex))) {
-        const selectedIndex = parseInt(sliceIndex);
-        if (selectedIndex >= 0 && selectedIndex < sliceOptions.length) {
-          sliceReference = sliceOptions[selectedIndex].value;
-        }
-      }
-    }
-    
-    const newDeduction = {
-      reason,
-      points: validPoints,
-      sliceReference,
-      timestamp: new Date().toISOString()
-    };
-    
-    setDeductions(prev => [...prev, newDeduction]);
-    setCurrentScore(prev => Math.max(prev - validPoints, 0));
-    
-    // Mark slice as having deductions if slice reference exists
-    if (sliceReference) {
-      setTestedSlices(prev => 
-        prev.map(slice => 
-          slice.lessonNumber === sliceReference.lessonNumber && 
-          slice.sliceTitle === sliceReference.sliceTitle
-            ? { ...slice, hasDeductions: true }
-            : slice
-        )
-      );
-    }
-  };
-
-  const removeDeduction = (index: number) => {
-    const deduction = deductions[index];
-    setDeductions(prev => prev.filter((_, i) => i !== index));
-    setCurrentScore(prev => Math.min(prev + deduction.points, 100));
-  };
-
-  const toggleTechniqueAttempted = (index: number) => {
-    setTechniquesAttempted(prev => 
-      prev.map((tech, i) => 
-        i === index ? { ...tech, attempted: !tech.attempted } : tech
+  const unmarkAll = () => {
+    setTestedSlices(prev => 
+      prev.map(slice => 
+        slice.isGroupHeader ? slice : { ...slice, tested: false }
       )
     );
   };
@@ -447,80 +476,10 @@ const DrillEvaluator: React.FC<DrillEvaluatorProps> = ({
     return 'text-green-600';
   };
 
-  const getTimerSeverity = () => {
-    if (isOvertime) return 'danger';
-    if (timeRemaining <= 30) return 'warning';
-    return 'success';
-  };
-
   const getScoreColor = (score: number) => {
     if (score >= 90) return 'text-green-600';
     if (score >= 70) return 'text-yellow-600';
     return 'text-red-600';
-  };
-
-  const getScoreSeverity = (score: number) => {
-    if (score >= 90) return 'success';
-    if (score >= 70) return 'warning';
-    return 'danger';
-  };
-
-  const sliceCheckboxTemplate = (slice: any) => {
-    if (slice.isGroupHeader) {
-      return <div className="text-center">—</div>;
-    }
-    
-    return (
-      <Checkbox 
-        checked={slice.tested || false}
-        onChange={() => toggleSliceTested(slice.id)}
-      />
-    );
-  };
-
-  const sliceInfoTemplate = (slice: any) => {
-    if (slice.isGroupHeader) {
-      return (
-        <div className="group-header">
-          <div className="font-bold text-lg text-primary">
-            {slice.groupHeader}
-          </div>
-        </div>
-      );
-    }
-    
-    return (
-      <div className={`slice-info ${slice.isCombination ? 'combination-slice' : ''}`}>
-        <div className="font-medium text-color">
-          {slice.isCombination ? '++' : ''} {slice.sliceTitle}
-        </div>
-        {slice.combinationText && (
-          <div className="text-xs text-blue-600 mt-1">
-            {slice.combinationText}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const sliceActionsTemplate = (slice: any) => {
-    if (slice.isGroupHeader) {
-      return <div className="text-center">—</div>;
-    }
-    
-    const hasDeductions = slice.hasDeductions || false;
-    
-    return (
-      <div className="flex items-center space-x-2">
-        {hasDeductions && (
-          <Tag severity="danger" value="Deductions" />
-        )}
-        <InlineDeduction 
-          sliceId={slice.id}
-          onAddDeduction={handleAddDeduction}
-        />
-      </div>
-    );
   };
 
   const completeTest = async () => {
@@ -605,361 +564,744 @@ const DrillEvaluator: React.FC<DrillEvaluatorProps> = ({
 
   if (!drill || !curriculum) return null;
 
+  const testedCount = testedSlices.filter(s => s.tested && !s.isGroupHeader).length;
+  const totalCount = testedSlices.filter(s => !s.isGroupHeader).length;
+
   return (
     <>
       <Toast ref={toast} />
       <Dialog
-        header={`Drill ${drill.drillNumber}: ${drill.title}`}
+        header={null}
         visible={visible}
         onHide={onClose}
-        style={{ width: '95vw', maxWidth: '1400px' }}
-        maximizable
+        style={{ width: '100vw', height: '100vh', maxWidth: 'none', maxHeight: 'none' }}
         modal
-        className="drill-evaluator-dialog"
+        className="sw-mobile-drill-dialog"
+        contentStyle={{ padding: 0, height: '100vh' }}
+        closable={false}
       >
-        <div className="space-y-6">
-          {/* Timer and Score Header */}
-          <Card className="shadow-2 border-round-2xl">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className={`text-3xl font-bold ${getTimerColor()}`}>
+        <div className="sw-mobile-drill-container">
+          {/* Mobile Header */}
+          <div className="sw-mobile-header">
+            <div className="sw-header-top">
+              <Button
+                icon="pi pi-times"
+                className="sw-close-btn"
+                onClick={onClose}
+                text
+                size="large"
+              />
+              <div className="sw-drill-title">
+                Drill {drill.drillNumber}: {drill.title}
+              </div>
+              <div className="sw-timer-score">
+                <div className={`sw-timer ${getTimerColor()}`}>
                   {getTimerDisplay()}
                 </div>
-                <div className="text-sm text-color-secondary">
-                  {isOvertime ? 'Overtime' : 'Time Remaining'}
-                </div>
-                <ProgressBar 
-                  value={isOvertime ? 100 : (timeRemaining / (drill.timeLimitMinutes * 60)) * 100}
-                  showValue={false}
-                  className="mt-2"
-                  color={getTimerSeverity()}
-                />
-              </div>
-              
-              <div className="text-center">
-                <div className={`text-3xl font-bold ${getScoreColor(currentScore)}`}>
-                  {currentScore}/100
-                </div>
-                <div className="text-sm text-color-secondary">Current Score</div>
-                <Tag 
-                  severity={getScoreSeverity(currentScore)}
-                  value={currentScore >= 90 ? 'PASSING' : 'FAILING'}
-                  className="mt-2"
-                />
-              </div>
-              
-              <div className="text-center">
-                <div className="text-lg font-semibold text-color">
-                  {testedSlices.filter(s => s.tested).length}/{testedSlices.length}
-                </div>
-                <div className="text-sm text-color-secondary">Slices Tested</div>
-              </div>
-              
-              <div className="text-center">
-                <div className="space-x-2">
-                  {!isRunning ? (
-                    <Button 
-                      label="Start Test" 
-                      icon="pi pi-play" 
-                      onClick={startTest}
-                      disabled={timeRemaining === 0}
-                      severity="success"
-                    />
-                  ) : (
-                    <Button 
-                      label="Pause" 
-                      icon="pi pi-pause" 
-                      onClick={pauseTest}
-                      severity="warning"
-                    />
-                  )}
+                <div className={`sw-score ${getScoreColor(currentScore)}`}>
+                  {currentScore}
                 </div>
               </div>
             </div>
-          </Card>
-
-          {/* Test Description */}
-          <Card className="shadow-2 border-round-2xl">
-            <h4 className="font-semibold mb-2">Test Instructions</h4>
-            <p className="text-color-secondary">{drill.description}</p>
-            {drill.specialRequirements && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-                <h5 className="font-medium text-blue-800 mb-1">Special Requirements:</h5>
-                <p className="text-sm text-blue-700">{drill.specialRequirements}</p>
+            
+            {/* Progress Bar */}
+            <div className="sw-progress-section">
+              <div className="sw-progress-info">
+                <span>{testedCount}/{totalCount} Slices Tested</span>
+                <span>{deductions.length} Deductions</span>
               </div>
+              <ProgressBar 
+                value={(testedCount / totalCount) * 100}
+                showValue={false}
+                className="sw-progress-bar"
+              />
+            </div>
+          </div>
+
+          {/* Utility Bar */}
+          <div className="sw-utility-bar">
+            <Button
+              label="Mark All"
+              icon="pi pi-check"
+              size="small"
+              severity="success"
+              onClick={markAllTested}
+              className="sw-utility-btn"
+            />
+            <Button
+              label="Unmark All"
+              icon="pi pi-times"
+              size="small"
+              severity="secondary"
+              onClick={unmarkAll}
+              className="sw-utility-btn"
+            />
+            <Button
+              label="Deductions"
+              icon="pi pi-minus"
+              size="small"
+              severity="danger"
+              onClick={() => setShowDeductions(!showDeductions)}
+              className="sw-utility-btn"
+            />
+            <Button
+              label="Notes"
+              icon="pi pi-comment"
+              size="small"
+              severity="info"
+              onClick={() => setShowNotes(!showNotes)}
+              className="sw-utility-btn"
+            />
+            {!isRunning ? (
+              <Button
+                label="Start"
+                icon="pi pi-play"
+                size="small"
+                severity="success"
+                onClick={startTest}
+                className="sw-utility-btn"
+              />
+            ) : (
+              <Button
+                label="Pause"
+                icon="pi pi-pause"
+                size="small"
+                severity="warning"
+                onClick={pauseTest}
+                className="sw-utility-btn"
+              />
             )}
-          </Card>
+          </div>
 
-          {/* Slice Checklist for Drills 1-4 */}
-          {!drill.isFreestyle && (
-            <Card className="shadow-2 border-round-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-semibold">Slice Checklist</h4>
-                <Button 
-                  label="Add Deduction" 
-                  icon="pi pi-minus" 
-                  size="small"
-                  severity="danger"
-                  onClick={addDeduction}
+          {/* Description Toggle */}
+          <div className="sw-description-toggle">
+            <Button
+              label={showDescription ? "Hide Instructions" : "Show Instructions"}
+              icon={showDescription ? "pi pi-chevron-up" : "pi pi-chevron-down"}
+              size="small"
+              text
+              onClick={() => setShowDescription(!showDescription)}
+              className="sw-toggle-btn"
+            />
+          </div>
+
+          {/* Collapsible Description */}
+          {showDescription && (
+            <div className="sw-description-panel">
+              <p className="sw-description-text">{drill.description}</p>
+              {drill.specialRequirements && (
+                <div className="sw-special-requirements">
+                  <strong>Special Requirements:</strong> {drill.specialRequirements}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Slice Checklist */}
+          <div className="sw-slice-checklist">
+            {testedSlices.map((slice) => (
+              <MobileSliceRow
+                key={slice.id}
+                slice={slice}
+                onToggle={toggleSliceTested}
+                onAddDeduction={handleAddDeduction}
+                onAddComment={handleAddSliceNote}
+              />
+            ))}
+          </div>
+
+          {/* Deduction Input Modal */}
+          {currentDeductionSlice && (
+            <div className="sw-deduction-modal">
+              <div className="sw-deduction-content">
+                <h4>Add Deduction</h4>
+                <InputTextarea
+                  value={deductionReason}
+                  onChange={(e) => setDeductionReason(e.target.value)}
+                  placeholder="Reason for deduction..."
+                  rows={3}
+                  className="sw-deduction-input"
+                  autoFocus
                 />
+                <div className="sw-deduction-actions">
+                  <Button
+                    label="Cancel"
+                    size="small"
+                    severity="secondary"
+                    onClick={cancelDeduction}
+                  />
+                  <Button
+                    label="Add (-1)"
+                    size="small"
+                    severity="danger"
+                    onClick={confirmDeduction}
+                    disabled={!deductionReason.trim()}
+                  />
+                </div>
               </div>
-              
-              <DataTable 
-                value={testedSlices}
-                responsiveLayout="scroll"
-                className="p-datatable-sm hierarchical-checklist"
-                rowClassName={(slice: any) => 
-                  slice.isGroupHeader 
-                    ? 'group-header-row' 
-                    : slice.isCombination 
-                      ? 'combination-row' 
-                      : ''
-                }
-              >
-                <Column 
-                  header="Tested" 
-                  body={(slice) => sliceCheckboxTemplate(slice)}
-                  style={{ width: '80px' }}
-                />
-                <Column 
-                  header="Lesson" 
-                  body={(slice) => slice.isGroupHeader ? '' : `L${slice.lessonNumber}`}
-                  style={{ width: '80px' }}
-                />
-                <Column 
-                  header="Slice" 
-                  body={(slice) => slice.isGroupHeader ? '' : `S${slice.sliceNumber}`}
-                  style={{ width: '80px' }}
-                />
-                <Column 
-                  header="Technique" 
-                  body={(slice) => sliceInfoTemplate(slice)}
-                  style={{ minWidth: '300px' }}
-                />
-                <Column 
-                  header="Actions" 
-                  body={(slice) => sliceActionsTemplate(slice)}
-                  style={{ width: '120px' }}
-                />
-              </DataTable>
-            </Card>
+            </div>
           )}
 
-          {/* Freestyle Drill Specific */}
-          {drill.isFreestyle && (
-            <>
-              <Card className="shadow-2 border-round-2xl">
-                <h4 className="font-semibold mb-3">Techniques Demonstrated</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {techniquesAttempted.map((tech, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-2 border rounded">
-                      <Checkbox 
-                        checked={tech.attempted}
-                        onChange={() => toggleTechniqueAttempted(index)}
-                      />
-                      <span className="text-sm">
-                        L{tech.lessonNumber}: {tech.sliceTitle}
-                      </span>
-                    </div>
-                  ))}
+          {/* Slice Note Input Modal */}
+          {currentNoteSlice && (
+            <div className="sw-note-modal">
+              <div className="sw-note-content">
+                <h4>Add Note for Slice</h4>
+                <InputTextarea
+                  value={sliceNoteText}
+                  onChange={(e) => setSliceNoteText(e.target.value)}
+                  placeholder="Add specific notes for this slice..."
+                  rows={4}
+                  className="sw-note-input"
+                  autoFocus
+                />
+                <div className="sw-note-actions">
+                  <Button
+                    label="Cancel"
+                    size="small"
+                    severity="secondary"
+                    onClick={cancelSliceNote}
+                  />
+                  <Button
+                    label="Save Note"
+                    size="small"
+                    severity="success"
+                    onClick={confirmSliceNote}
+                  />
                 </div>
-              </Card>
-
-              <Card className="shadow-2 border-round-2xl">
-                <h4 className="font-semibold mb-3">Quality Ratings</h4>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Details (0-100)</label>
-                    <Slider 
-                      value={qualityRatings.details}
-                      onChange={(e) => setQualityRatings(prev => ({ ...prev, details: e.value as number }))}
-                      min={0}
-                      max={100}
-                      step={5}
-                    />
-                    <div className="text-sm text-color-secondary mt-1">
-                      Understanding of technique concepts: {qualityRatings.details}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Conviction (0-100)</label>
-                    <Slider 
-                      value={qualityRatings.conviction}
-                      onChange={(e) => setQualityRatings(prev => ({ ...prev, conviction: e.value as number }))}
-                      min={0}
-                      max={100}
-                      step={5}
-                    />
-                    <div className="text-sm text-color-secondary mt-1">
-                      Application with belief and effectiveness: {qualityRatings.conviction}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Reflexes (0-100)</label>
-                    <Slider 
-                      value={qualityRatings.reflexes}
-                      onChange={(e) => setQualityRatings(prev => ({ ...prev, reflexes: e.value as number }))}
-                      min={0}
-                      max={100}
-                      step={5}
-                    />
-                    <div className="text-sm text-color-secondary mt-1">
-                      Speed and appropriateness of responses: {qualityRatings.reflexes}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </>
+              </div>
+            </div>
           )}
 
-          {/* Deductions Panel */}
-          <Panel header="Score Deductions" className="shadow-2 border-round-2xl">
-            {deductions.length > 0 ? (
-              <div className="space-y-2">
-                {deductions.map((deduction, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded">
-                    <div className="flex-1">
-                      <div className="font-medium text-red-800">
+          {/* Collapsible Notes Panel */}
+          {showNotes && (
+            <div className="sw-notes-panel">
+              <h4>Evaluator Notes</h4>
+              <InputTextarea
+                value={evaluatorNotes}
+                onChange={(e) => setEvaluatorNotes(e.target.value)}
+                placeholder="Enter detailed feedback and observations..."
+                rows={4}
+                className="sw-notes-input"
+              />
+            </div>
+          )}
+
+          {/* Collapsible Deductions Panel */}
+          {showDeductions && (
+            <div className="sw-deductions-panel">
+              <h4>Score Deductions ({deductions.length})</h4>
+              {deductions.length > 0 ? (
+                <div className="sw-deductions-list">
+                  {deductions.map((deduction, index) => (
+                    <div key={index} className="sw-deduction-item">
+                      <div className="sw-deduction-reason">
                         {deduction.reason} (-{deduction.points} points)
                       </div>
                       {deduction.sliceReference && (
-                        <div className="text-sm text-red-600 mt-1">
+                        <div className="sw-deduction-slice">
                           L{deduction.sliceReference.lessonNumber}: {deduction.sliceReference.sliceTitle}
                         </div>
                       )}
                     </div>
-                    <Button 
-                      icon="pi pi-times" 
-                      size="small"
-                      severity="danger"
-                      text
-                      onClick={() => removeDeduction(index)}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-color-secondary text-sm">No deductions yet</p>
-            )}
-          </Panel>
+                  ))}
+                </div>
+              ) : (
+                <p className="sw-no-deductions">No deductions yet</p>
+              )}
+            </div>
+          )}
 
-          {/* Evaluator Notes */}
-          <Card className="shadow-2 border-round-2xl">
-            <h4 className="font-semibold mb-3">Evaluator Notes</h4>
-            <InputTextarea
-              value={evaluatorNotes}
-              onChange={(e) => setEvaluatorNotes(e.target.value)}
-              rows={4}
-              placeholder="Enter detailed feedback and observations..."
-              className="w-full"
-            />
-          </Card>
-
-          {/* Actions */}
-          <div className="flex justify-end space-x-2">
-            <Button 
-              label="Cancel" 
-              icon="pi pi-times" 
-              severity="secondary"
-              onClick={onClose}
-            />
-            <Button 
-              label="Complete Test" 
-              icon="pi pi-check" 
+          {/* Complete Button */}
+          <div className="sw-complete-section">
+            <Button
+              label="Complete Test"
+              icon="pi pi-check"
               onClick={completeTest}
               disabled={isRunning}
               severity="success"
+              className="sw-complete-btn"
             />
           </div>
         </div>
       </Dialog>
 
       <style jsx>{`
-        .drill-evaluator-dialog .p-dialog {
+        .sw-mobile-drill-dialog .p-dialog {
           background-color: var(--surface-card);
           color: var(--text-color);
+          border-radius: 0;
+          margin: 0;
+          max-height: 100vh;
         }
         
-        .drill-evaluator-dialog .p-dialog-header {
+        .sw-mobile-drill-dialog .p-dialog-content {
+          background-color: var(--surface-card);
+          color: var(--text-color);
+          padding: 0;
+          height: 100vh;
+          overflow: hidden;
+        }
+        
+        .sw-mobile-drill-container {
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
           background-color: var(--surface-ground);
+        }
+        
+        .sw-mobile-header {
+          background-color: var(--surface-card);
+          border-bottom: 2px solid var(--primary-color);
+          padding: 1rem;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        }
+        
+        .sw-header-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 1rem;
+        }
+        
+        .sw-close-btn {
+          font-size: 1.5rem;
+          color: var(--text-color);
+          min-width: 48px;
+          min-height: 48px;
+        }
+        
+        .sw-drill-title {
+          font-size: 1.25rem;
+          font-weight: bold;
+          color: var(--text-color);
+          text-align: center;
+          flex: 1;
+          margin: 0 1rem;
+        }
+        
+        .sw-timer-score {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.25rem;
+        }
+        
+        .sw-timer {
+          font-size: 1.5rem;
+          font-weight: bold;
+        }
+        
+        .sw-score {
+          font-size: 1.25rem;
+          font-weight: bold;
+        }
+        
+        .sw-progress-section {
+          margin-top: 0.5rem;
+        }
+        
+        .sw-progress-info {
+          display: flex;
+          justify-content: space-between;
+          font-size: 0.875rem;
+          color: var(--text-color-secondary);
+          margin-bottom: 0.5rem;
+        }
+        
+        .sw-progress-bar {
+          height: 8px;
+        }
+        
+        .sw-utility-bar {
+          display: flex;
+          gap: 0.5rem;
+          padding: 1rem;
+          background-color: var(--surface-card);
           border-bottom: 1px solid var(--surface-border);
-          color: var(--text-color);
+          overflow-x: auto;
+          flex-shrink: 0;
         }
         
-        .drill-evaluator-dialog .p-dialog-content {
-          background-color: var(--surface-card);
-          color: var(--text-color);
+        .sw-utility-btn {
+          min-width: 80px;
+          min-height: 44px;
+          font-size: 0.875rem;
+          flex-shrink: 0;
         }
         
-        .deduction-input {
+        .sw-description-toggle {
+          padding: 0.5rem 1rem;
+          background-color: var(--surface-50);
+          border-bottom: 1px solid var(--surface-border);
+        }
+        
+        .sw-toggle-btn {
+          width: 100%;
+          justify-content: center;
+        }
+        
+        .sw-description-panel {
+          padding: 1rem;
           background-color: var(--surface-card);
-          border: 1px solid var(--surface-border);
+          border-bottom: 1px solid var(--surface-border);
+        }
+        
+        .sw-description-text {
+          margin: 0 0 1rem 0;
+          line-height: 1.5;
+        }
+        
+        .sw-special-requirements {
+          padding: 0.75rem;
+          background-color: var(--blue-50);
+          border: 1px solid var(--blue-200);
           border-radius: 4px;
-          padding: 8px;
+          font-size: 0.875rem;
         }
         
-        .deduction-input .p-inputtextarea {
-          background-color: var(--surface-ground);
-          color: var(--text-color);
-          border: 1px solid var(--surface-border);
+        .sw-slice-checklist {
+          flex: 1;
+          overflow-y: auto;
+          padding: 0.5rem;
         }
         
-        .group-header {
+        .sw-mobile-group-header {
           background-color: var(--primary-50);
           border-left: 4px solid var(--primary-color);
-          padding: 12px 16px;
-          margin: 8px 0;
+          padding: 1rem;
+          margin: 0.5rem 0;
           border-radius: 4px;
         }
         
-        .combination-slice {
-          background-color: var(--surface-50);
-          border-left: 3px solid var(--blue-500);
-          padding-left: 8px;
-          margin-left: 16px;
+        .sw-group-title {
+          font-weight: bold;
+          font-size: 1.125rem;
+          color: var(--primary-color);
         }
         
-        .hierarchical-checklist .p-datatable-tbody > tr.group-header-row {
-          background-color: var(--primary-50);
-          border-bottom: 2px solid var(--primary-color);
-        }
-        
-        .hierarchical-checklist .p-datatable-tbody > tr.combination-row {
-          background-color: var(--surface-50);
-          border-left: 3px solid var(--blue-500);
-        }
-        
-        .slice-info {
-          color: var(--text-color);
-        }
-        
-        .slice-info .text-color-secondary {
-          color: var(--text-color-secondary);
-        }
-        
-        .timer-display.success { color: var(--green-500); }
-        .timer-display.warning { color: var(--yellow-500); }
-        .timer-display.danger { color: var(--red-500); }
-        
-        .p-datatable .p-datatable-tbody > tr {
+        .sw-mobile-slice-row {
           background-color: var(--surface-card);
+          border: 1px solid var(--surface-border);
+          border-radius: 8px;
+          margin-bottom: 0.75rem;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .sw-mobile-slice-row:hover {
+          border-color: var(--primary-color);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .sw-mobile-slice-row.tested {
+          background-color: var(--green-50);
+          border-color: var(--green-300);
+        }
+        
+        .sw-mobile-slice-row.has-deductions {
+          border-color: var(--red-300);
+        }
+        
+        .sw-mobile-slice-row.has-notes {
+          border-color: var(--yellow-300);
+          background-color: var(--yellow-50);
+        }
+        
+        .sw-slice-main {
+          display: flex;
+          align-items: center;
+          padding: 1.25rem;
+          gap: 1rem;
+          min-height: 60px;
+        }
+        
+        .sw-slice-checkbox {
+          flex-shrink: 0;
+          min-width: 48px;
+          min-height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .sw-large-checkbox {
+          transform: scale(1.3);
+        }
+        
+        .sw-slice-info {
+          flex: 1;
+          min-width: 0;
+          cursor: pointer;
+          padding: 0.25rem 0;
+        }
+        
+        .sw-slice-title {
+          font-weight: 600;
+          font-size: 1rem;
           color: var(--text-color);
+          margin-bottom: 0.25rem;
+          line-height: 1.3;
         }
         
-        .p-datatable .p-datatable-tbody > tr:nth-child(even) {
-          background-color: var(--surface-50);
+        .sw-slice-meta {
+          font-size: 0.875rem;
+          color: var(--text-color-secondary);
+          line-height: 1.2;
         }
         
-        .p-datatable .p-datatable-tbody > tr:hover {
+        .sw-combination-text {
+          color: var(--blue-600);
+        }
+        
+        .sw-slice-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-shrink: 0;
+        }
+        
+        .sw-deduction-badge {
+          font-size: 0.75rem;
+        }
+        
+        .sw-action-btn {
+          min-width: 44px;
+          min-height: 44px;
+          border-radius: 6px;
+          transition: all 0.2s ease;
+        }
+        
+        .sw-action-btn:hover {
           background-color: var(--surface-100);
         }
         
-        .p-datatable .p-datatable-thead > tr > th {
-          background-color: var(--surface-ground);
-          color: var(--text-color);
-          border-bottom: 1px solid var(--surface-border);
+        .sw-note-btn--active {
+          background-color: var(--yellow-100) !important;
+          color: var(--yellow-700) !important;
+        }
+        
+        .sw-deduction-modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0,0,0,0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 1rem;
+        }
+        
+        .sw-deduction-content {
+          background-color: var(--surface-card);
+          border-radius: 8px;
+          padding: 1.5rem;
+          width: 100%;
+          max-width: 400px;
+        }
+        
+        .sw-deduction-content h4 {
+          margin: 0 0 1rem 0;
+          font-size: 1.125rem;
+        }
+        
+        .sw-deduction-input {
+          width: 100%;
+          margin-bottom: 1rem;
+        }
+        
+        .sw-deduction-actions {
+          display: flex;
+          gap: 0.5rem;
+          justify-content: flex-end;
+        }
+        
+        .sw-note-modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0,0,0,0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 1rem;
+        }
+        
+        .sw-note-content {
+          background-color: var(--surface-card);
+          border-radius: 8px;
+          padding: 1.5rem;
+          width: 100%;
+          max-width: 400px;
+        }
+        
+        .sw-note-content h4 {
+          margin: 0 0 1rem 0;
+          font-size: 1.125rem;
+        }
+        
+        .sw-note-input {
+          width: 100%;
+          margin-bottom: 1rem;
+        }
+        
+        .sw-note-actions {
+          display: flex;
+          gap: 0.5rem;
+          justify-content: flex-end;
+        }
+        
+        .sw-notes-panel,
+        .sw-deductions-panel {
+          background-color: var(--surface-card);
+          border-top: 1px solid var(--surface-border);
+          padding: 1rem;
+        }
+        
+        .sw-notes-panel h4,
+        .sw-deductions-panel h4 {
+          margin: 0 0 1rem 0;
+          font-size: 1rem;
+        }
+        
+        .sw-notes-input {
+          width: 100%;
+        }
+        
+        .sw-deductions-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        
+        .sw-deduction-item {
+          background-color: var(--red-50);
+          border: 1px solid var(--red-200);
+          border-radius: 4px;
+          padding: 0.75rem;
+        }
+        
+        .sw-deduction-reason {
+          font-weight: 600;
+          color: var(--red-800);
+          margin-bottom: 0.25rem;
+        }
+        
+        .sw-deduction-slice {
+          font-size: 0.875rem;
+          color: var(--red-600);
+        }
+        
+        .sw-no-deductions {
+          color: var(--text-color-secondary);
+          font-style: italic;
+          margin: 0;
+        }
+        
+        .sw-complete-section {
+          padding: 1rem;
+          background-color: var(--surface-card);
+          border-top: 1px solid var(--surface-border);
+          flex-shrink: 0;
+        }
+        
+        .sw-complete-btn {
+          width: 100%;
+          min-height: 48px;
+          font-size: 1rem;
+          font-weight: 600;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+          .sw-drill-title {
+            font-size: 1.125rem;
+          }
+          
+          .sw-timer {
+            font-size: 1.25rem;
+          }
+          
+          .sw-score {
+            font-size: 1rem;
+          }
+          
+          .sw-slice-title {
+            font-size: 0.9rem;
+          }
+          
+          .sw-slice-meta {
+            font-size: 0.8rem;
+          }
+          
+          .sw-slice-main {
+            padding: 1rem;
+            min-height: 56px;
+          }
+          
+          .sw-action-btn {
+            min-width: 40px;
+            min-height: 40px;
+          }
+          
+          .sw-large-checkbox {
+            transform: scale(1.2);
+          }
+        }
+        
+        /* Very small screens */
+        @media (max-width: 480px) {
+          .sw-header-top {
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: stretch;
+          }
+          
+          .sw-timer-score {
+            flex-direction: row;
+            justify-content: space-between;
+            width: 100%;
+          }
+          
+          .sw-utility-bar {
+            flex-wrap: wrap;
+            gap: 0.25rem;
+          }
+          
+          .sw-utility-btn {
+            min-width: 70px;
+            font-size: 0.75rem;
+          }
+          
+          .sw-slice-main {
+            padding: 0.875rem;
+            gap: 0.75rem;
+          }
+          
+          .sw-slice-title {
+            font-size: 0.875rem;
+          }
+          
+          .sw-slice-meta {
+            font-size: 0.75rem;
+          }
+          
+          .sw-action-btn {
+            min-width: 36px;
+            min-height: 36px;
+          }
+          
+          .sw-large-checkbox {
+            transform: scale(1.1);
+          }
         }
       `}</style>
     </>

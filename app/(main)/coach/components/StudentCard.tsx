@@ -20,13 +20,12 @@ interface StudentWithStats extends Student {
 interface StudentCardProps {
   student: StudentWithStats;
   onStartSession: (studentId: string) => void;
-  onStartTest: (studentId: string, drillNumber: number) => void;
+  // TODO: Add onStartTest prop when drill initiation is implemented
 }
 
 const StudentCard: React.FC<StudentCardProps> = ({
   student,
-  onStartSession,
-  onStartTest
+  onStartSession
 }) => {
   const getStatusColor = (status: string) => {
     switch (status) {

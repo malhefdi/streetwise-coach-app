@@ -12,7 +12,7 @@ interface TestOverrideDialogProps {
   drillName: string;
   completedLessons: number;
   requiredLessons: number;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string) => void | Promise<void>;
 }
 
 const TestOverrideDialog: React.FC<TestOverrideDialogProps> = ({
@@ -34,6 +34,9 @@ const TestOverrideDialog: React.FC<TestOverrideDialogProps> = ({
       await onConfirm(overrideReason.trim());
       setOverrideReason('');
       onHide();
+    } catch (error) {
+      console.error('Error in onConfirm:', error);
+      // Don't hide dialog on error, let user retry
     } finally {
       setIsSubmitting(false);
     }

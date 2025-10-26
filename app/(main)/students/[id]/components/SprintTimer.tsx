@@ -171,7 +171,7 @@ const SprintTimer: React.FC<SprintTimerProps> = ({
 
         {!isResting && timeLeft === 0 && !isCompleted && (
           <Message 
-            severity="warning" 
+            severity="warn" 
             text="Time's up! Complete the sprint or continue if needed." 
             className="mb-4"
           />
@@ -185,7 +185,7 @@ const SprintTimer: React.FC<SprintTimerProps> = ({
               <Tag 
                 key={index}
                 value={`L${technique.lessonNumber}: ${technique.sliceTitle}`}
-                severity="secondary"
+                severity="info"
                 className="text-xs"
               />
             ))}
@@ -231,7 +231,7 @@ const SprintTimer: React.FC<SprintTimerProps> = ({
             </>
           )}
 
-          {isCompleted && isResting && sprintGroup.restTimeMinutes > 0 && (
+          {(isCompleted || isResting) && sprintGroup.restTimeMinutes > 0 && (
             <Button
               label="Complete Rest"
               icon="pi pi-check"
@@ -247,7 +247,7 @@ const SprintTimer: React.FC<SprintTimerProps> = ({
               <Button
                 label="Previous Sprint"
                 icon="pi pi-chevron-left"
-                severity="secondary"
+                severity="info"
                 onClick={onPreviousSprint}
                 size="large"
               />
@@ -258,7 +258,7 @@ const SprintTimer: React.FC<SprintTimerProps> = ({
                 label="Next Sprint"
                 icon="pi pi-chevron-right"
                 iconPos="right"
-                severity="secondary"
+                severity="info"
                 onClick={onNextSprint}
                 size="large"
               />

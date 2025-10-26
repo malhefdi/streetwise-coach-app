@@ -13,8 +13,10 @@ import { Divider } from 'primereact/divider';
 import { Badge } from 'primereact/badge';
 import { Message } from 'primereact/message';
 import { Tooltip } from 'primereact/tooltip';
+import { Toast } from 'primereact/toast';
 import { gc2Curriculum } from '@/app/data/gc2.curriculum';
 import { getGC2TestDrills } from '@/app/data/gc2.test';
+import { dataService } from '@/app/services/dataService';
 import type { TestDrill, TestDrillReadiness } from '@/app/types/test-drill.types';
 import type { StudentPlan, StudentProgress } from '@/app/types/plan.types';
 import type { Lesson, Slice } from '@/app/data/curriculum';
@@ -50,12 +52,152 @@ const findSliceById = (curriculum: any, sliceId: string): Slice | undefined => {
   return undefined;
 };
 
+// Helper function to group items by lesson
+const groupItemsByLesson = (items: any[]): Record<string, any[]> => {
+  return items.reduce((groups, item, index) => {
+    const groupKey = `L${item.lessonNumber}`;
+    if (!groups[groupKey]) {
+      groups[groupKey] = [];
+    }
+    groups[groupKey].push({ ...item, originalIndex: index });
+    return groups;
+  }, {} as Record<string, any[]>);
+};
+
+// Helper function to process a technique item
+const processTechniqueItem = (
+  item: any,
+  gc2Curriculum: any,
+  studentPlan: StudentPlan,
+  studentProgress: StudentProgress
+): { techniques: TechniqueItem[]; completedCount: number; missingPrerequisites: string[] } => {
+  const techniques: TechniqueItem[] = [];
+  const missingPrerequisites: string[] = [];
+  let completedCount = 0;
+
+  // Process main slice
+  const mainSliceId = item.ids[0];
+  const slice = findSliceById(gc2Curriculum, mainSliceId);
+  if (!slice) {
+    missingPrerequisites.push(`Slice ID: ${mainSliceId} (Not Found)`);
+    return { techniques, completedCount, missingPrerequisites };
+  }
+
+  const lesson = gc2Curriculum.lessons.find((l: any) => l.id === mainSliceId.split('-').slice(0, 2).join('-'));
+  if (!lesson) {
+    missingPrerequisites.push(`Lesson for ${mainSliceId} (Not Found)`);
+    return { techniques, completedCount, missingPrerequisites };
+  }
+
+  // Check if lesson is in student's plan
+  const isInPlan = studentPlan.lessonIds.includes(lesson.id);
+  if (!isInPlan) {
+    missingPrerequisites.push(`L${lesson.lessonNumber}: ${lesson.technique}`);
+  }
+
+  // Check completion status
+  const lessonProgress = studentProgress.lessons[lesson.id];
+  const isCompleted = lessonProgress?.completedAt !== undefined;
+  const isInProgress = Boolean(lessonProgress?.startedAt && !isCompleted);
+  
+  // Check slice completion
+  let sliceCompleted = false;
+  if (lessonProgress) {
+    const sliceIndex = lesson.slices.indexOf(slice);
+    if (sliceIndex >= 0 && sliceIndex < lessonProgress.slices.length) {
+      const sliceProgress = lessonProgress.slices[sliceIndex];
+      sliceCompleted = Boolean(sliceProgress?.steps.every(step => step.completed));
+    }
+  }
+
+  if (sliceCompleted) completedCount++;
+
+  // Add main slice
+  techniques.push({
+    lessonNumber: lesson.lessonNumber,
+    lessonTitle: lesson.technique,
+    sliceTitle: slice.title,
+    combination: item.combination,
+    isCompleted: sliceCompleted,
+    isInProgress: isInProgress && !sliceCompleted,
+    isAvailable: isInPlan,
+    lessonId: lesson.id,
+    sliceId: slice.id
+  });
+
+  // Process combination slices if they exist
+  if (item.ids.length > 1) {
+    item.ids.slice(1).forEach((sliceId: string, index: number) => {
+      const comboSlice = findSliceById(gc2Curriculum, sliceId);
+      if (!comboSlice) {
+        missingPrerequisites.push(`Combination Slice ID: ${sliceId} (Not Found)`);
+        return;
+      }
+
+      const comboLesson = gc2Curriculum.lessons.find((l: any) => l.id === sliceId.split('-').slice(0, 2).join('-'));
+      if (!comboLesson) {
+        missingPrerequisites.push(`Combination Lesson for ${sliceId} (Not Found)`);
+        return;
+      }
+
+      // Check combination slice completion
+      const comboLessonProgress = studentProgress.lessons[comboLesson.id];
+      let comboSliceCompleted = false;
+      if (comboLessonProgress) {
+        const comboSliceIndex = comboLesson.slices.indexOf(comboSlice);
+        if (comboSliceIndex >= 0 && comboSliceIndex < comboLessonProgress.slices.length) {
+          const comboSliceProgress = comboLessonProgress.slices[comboSliceIndex];
+          comboSliceCompleted = Boolean(comboSliceProgress?.steps.every(step => step.completed));
+        }
+      }
+
+      if (comboSliceCompleted) completedCount++;
+
+      // Add combination slice
+      techniques.push({
+        lessonNumber: comboLesson.lessonNumber,
+        lessonTitle: comboLesson.technique,
+        sliceTitle: comboSlice.title,
+        combination: item.combination,
+        isCompleted: comboSliceCompleted,
+        isInProgress: false,
+        isAvailable: isInPlan,
+        lessonId: comboLesson.id,
+        sliceId: comboSlice.id,
+        isCombination: true
+      } as TechniqueItem & { isCombination: boolean });
+    });
+  }
+
+  return { techniques, completedCount, missingPrerequisites };
+};
+
+// Helper function to compute readiness
+const computeReadiness = (
+  techniquesCount: number,
+  completedTechniques: number,
+  missingPrerequisites: string[],
+  drillNumber: number
+): TestDrillReadiness => {
+  const completionPercentage = techniquesCount > 0 
+    ? Math.round((completedTechniques / techniquesCount) * 100) 
+    : 0;
+
+  return {
+    drillNumber,
+    isReady: missingPrerequisites.length === 0 && completionPercentage === 100,
+    missingLessons: missingPrerequisites,
+    completionPercentage
+  };
+};
+
 const TestDrillTracker: React.FC<TestDrillTrackerProps> = ({
   studentId,
   studentPlan,
   studentProgress,
   onDrillSelect
 }) => {
+  const toast = React.useRef<Toast>(null);
   const [drillsWithReadiness, setDrillsWithReadiness] = useState<Array<{ 
     drill: TestDrill; 
     readiness: TestDrillReadiness;
@@ -68,6 +210,29 @@ const TestDrillTracker: React.FC<TestDrillTrackerProps> = ({
   const [showOverrideDialog, setShowOverrideDialog] = useState(false);
   const [selectedDrillForOverride, setSelectedDrillForOverride] = useState<TestDrill | null>(null);
   const [overrideReasons, setOverrideReasons] = useState<Record<string, string>>({});
+
+  const saveOverrideToBackend = async (drillNumber: number, reason: string) => {
+    try {
+      await dataService.saveTestDrillOverride(studentId, drillNumber, reason);
+    } catch (error) {
+      console.error('Error saving override to backend:', error);
+      throw error;
+    }
+  };
+
+  // Load existing overrides on mount
+  useEffect(() => {
+    const loadOverrides = async () => {
+      try {
+        const overrides = await dataService.getTestDrillOverrides(studentId);
+        setOverrideReasons(overrides);
+      } catch (error) {
+        console.error('Error loading overrides:', error);
+      }
+    };
+    
+    loadOverrides();
+  }, [studentId]);
 
   // Calculate drill readiness and technique status
   const calculateDrillData = useMemo(() => {
@@ -95,14 +260,7 @@ const TestDrillTracker: React.FC<TestDrillTrackerProps> = ({
       let completedTechniques = 0;
 
       // Group items by lesson for better organization
-      const groupedItems = drill.items.reduce((groups, item, index) => {
-        const groupKey = `L${item.lessonNumber}`;
-        if (!groups[groupKey]) {
-          groups[groupKey] = [];
-        }
-        groups[groupKey].push({ ...item, originalIndex: index });
-        return groups;
-      }, {} as Record<string, any[]>);
+      const groupedItems = groupItemsByLesson(drill.items);
 
       // Process each group
       Object.entries(groupedItems).forEach(([groupKey, items]) => {
@@ -126,108 +284,19 @@ const TestDrillTracker: React.FC<TestDrillTrackerProps> = ({
 
         // Process items in this group
         items.forEach(item => {
-          // Process main slice
-          const mainSliceId = item.ids[0];
-          const slice = findSliceById(gc2Curriculum, mainSliceId);
-          if (!slice) {
-            missingPrerequisites.push(`Slice ID: ${mainSliceId} (Not Found)`);
-            return;
-          }
-
-          const lesson = gc2Curriculum.lessons.find(l => l.id === mainSliceId.split('-').slice(0, 2).join('-'));
-          if (!lesson) {
-            missingPrerequisites.push(`Lesson for ${mainSliceId} (Not Found)`);
-            return;
-          }
-
-          // Check if lesson is in student's plan
-          const isInPlan = studentPlan.lessonIds.includes(lesson.id);
-          if (!isInPlan) {
-            missingPrerequisites.push(`L${lesson.lessonNumber}: ${lesson.technique}`);
-          }
-
-          // Check completion status
-          const lessonProgress = studentProgress.lessons[lesson.id];
-          const isCompleted = lessonProgress?.completedAt !== undefined;
-          const isInProgress = Boolean(lessonProgress?.startedAt && !isCompleted);
-          
-          // Check slice completion
-          let sliceCompleted = false;
-          if (lessonProgress) {
-            const sliceIndex = lesson.slices.indexOf(slice);
-            const sliceProgress = lessonProgress.slices[sliceIndex];
-            sliceCompleted = Boolean(sliceProgress?.steps.every(step => step.completed));
-          }
-
-          if (sliceCompleted) completedTechniques++;
-
-          // Add main slice
-          techniques.push({
-            lessonNumber: lesson.lessonNumber,
-            lessonTitle: lesson.technique,
-            sliceTitle: slice.title,
-            combination: item.combination,
-            isCompleted: sliceCompleted,
-            isInProgress: isInProgress && !sliceCompleted,
-            isAvailable: isInPlan,
-            lessonId: lesson.id,
-            sliceId: slice.id
-          });
-
-          // Process combination slices if they exist
-          if (item.ids.length > 1) {
-            item.ids.slice(1).forEach((sliceId: string, index: number) => {
-              const comboSlice = findSliceById(gc2Curriculum, sliceId);
-              if (!comboSlice) {
-                missingPrerequisites.push(`Combination Slice ID: ${sliceId} (Not Found)`);
-                return;
-              }
-
-              const comboLesson = gc2Curriculum.lessons.find(l => l.id === sliceId.split('-').slice(0, 2).join('-'));
-              if (!comboLesson) {
-                missingPrerequisites.push(`Combination Lesson for ${sliceId} (Not Found)`);
-                return;
-              }
-
-              // Check combination slice completion
-              const comboLessonProgress = studentProgress.lessons[comboLesson.id];
-              let comboSliceCompleted = false;
-              if (comboLessonProgress) {
-                const comboSliceIndex = comboLesson.slices.indexOf(comboSlice);
-                const comboSliceProgress = comboLessonProgress.slices[comboSliceIndex];
-                comboSliceCompleted = Boolean(comboSliceProgress?.steps.every(step => step.completed));
-              }
-
-              if (comboSliceCompleted) completedTechniques++;
-
-              // Add combination slice
-              techniques.push({
-                lessonNumber: comboLesson.lessonNumber,
-                lessonTitle: comboLesson.technique,
-                sliceTitle: comboSlice.title,
-                combination: item.combination,
-                isCompleted: comboSliceCompleted,
-                isInProgress: false,
-                isAvailable: isInPlan,
-                lessonId: comboLesson.id,
-                sliceId: comboSlice.id,
-                isCombination: true
-              } as TechniqueItem & { isCombination: boolean });
-            });
-          }
+          const result = processTechniqueItem(item, gc2Curriculum, studentPlan, studentProgress);
+          techniques.push(...result.techniques);
+          missingPrerequisites.push(...result.missingPrerequisites);
+          completedTechniques += result.completedCount;
         });
       });
 
-      const completionPercentage = techniques.length > 0 
-        ? Math.round((completedTechniques / techniques.length) * 100) 
-        : 0;
-
-      const readiness: TestDrillReadiness = {
-        drillNumber: drill.drillNumber,
-        isReady: missingPrerequisites.length === 0 && completionPercentage === 100,
-        missingLessons: missingPrerequisites,
-        completionPercentage
-      };
+      const readiness = computeReadiness(
+        techniques.length,
+        completedTechniques,
+        missingPrerequisites,
+        drill.drillNumber
+      );
 
       return {
         drill,
@@ -398,7 +467,9 @@ const TestDrillTracker: React.FC<TestDrillTrackerProps> = ({
 
 
   return (
-    <Card title="Test Preparation" className="shadow-2 border-round-2xl">
+    <>
+      <Toast ref={toast} />
+      <Card title="Test Preparation" className="shadow-2 border-round-2xl">
       <div className="mb-4">
         <div className="flex align-items-center justify-content-between mb-2">
           <span className="font-medium">Overall Progress</span>
@@ -643,18 +714,42 @@ const TestDrillTracker: React.FC<TestDrillTrackerProps> = ({
           drillsWithReadiness.find(d => d.drill.drillNumber === selectedDrillForOverride.drillNumber)?.readiness.completionPercentage || 0 
           : 0}
         requiredLessons={100}
-        onConfirm={(reason) => {
+        onConfirm={async (reason) => {
           if (selectedDrillForOverride) {
+            const drillNumber = selectedDrillForOverride.drillNumber;
+            
+            // Optimistic update
             setOverrideReasons(prev => ({
               ...prev,
-              [selectedDrillForOverride.drillNumber]: reason
+              [drillNumber]: reason
             }));
-            // TODO: Save override reason to backend
-            console.log('Override confirmed for drill', selectedDrillForOverride.drillNumber, 'with reason:', reason);
+
+            try {
+              await saveOverrideToBackend(drillNumber, reason);
+              toast.current?.show({
+                severity: 'success',
+                summary: 'Success',
+                detail: 'Override reason saved successfully'
+              });
+            } catch (error) {
+              // Revert optimistic update on failure
+              setOverrideReasons(prev => {
+                const newReasons = { ...prev };
+                delete newReasons[drillNumber];
+                return newReasons;
+              });
+              
+              toast.current?.show({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Failed to save override reason. Please try again.'
+              });
+            }
           }
         }}
       />
     </Card>
+    </>
   );
 };
 

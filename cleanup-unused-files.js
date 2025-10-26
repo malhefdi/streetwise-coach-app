@@ -3,6 +3,24 @@
 const fs = require('fs');
 const path = require('path');
 
+// Validate working directory
+function validateWorkingDirectory() {
+  const requiredFiles = ['package.json', 'app'];
+  const missingFiles = requiredFiles.filter(file => !fs.existsSync(file));
+  
+  if (missingFiles.length > 0) {
+    console.error('❌ Error: Script must be run from the project root directory.');
+    console.error(`Missing required files/directories: ${missingFiles.join(', ')}`);
+    console.error('Please run this script from the project root where package.json and app/ directory exist.');
+    process.exit(1);
+  }
+  
+  console.log('✅ Working directory validation passed');
+}
+
+// Validate before proceeding
+validateWorkingDirectory();
+
 // Files and directories to remove
 const filesToRemove = [
   // Remove entire directories
@@ -32,17 +50,23 @@ const filesToRemove = [
 ];
 
 function removeFileOrDir(filePath) {
-  if (fs.existsSync(filePath)) {
-    const stat = fs.statSync(filePath);
-    if (stat.isDirectory()) {
-      fs.rmSync(filePath, { recursive: true, force: true });
-      console.log(`✅ Removed directory: ${filePath}`);
+  try {
+    if (fs.existsSync(filePath)) {
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        fs.rmSync(filePath, { recursive: true, force: true });
+        console.log(`✅ Removed directory: ${filePath}`);
+      } else {
+        fs.unlinkSync(filePath);
+        console.log(`✅ Removed file: ${filePath}`);
+      }
     } else {
-      fs.unlinkSync(filePath);
-      console.log(`✅ Removed file: ${filePath}`);
+      console.log(`⚠️  File/directory not found: ${filePath}`);
     }
-  } else {
-    console.log(`⚠️  File/directory not found: ${filePath}`);
+  } catch (error) {
+    console.error(`❌ Error removing ${filePath}:`, error.message);
+    console.error(`Stack trace:`, error.stack);
+    // Continue with other deletions instead of crashing
   }
 }
 

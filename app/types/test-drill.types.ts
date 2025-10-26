@@ -86,6 +86,7 @@ export interface TestDrillProgress {
     sliceTitle: string;
     tested: boolean;
     hasDeductions: boolean;
+    notes?: string; // Add slice-specific notes
   }>;
   testedSprints?: Array<{
     groupNumber: number;

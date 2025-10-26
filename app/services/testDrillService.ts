@@ -1,9 +1,16 @@
 // Test Drill Service - Helper functions for test drill management and bidirectional lookup
 import type { Curriculum, Lesson, Slice } from '@/app/data/curriculum';
-import type { TestDrill, TestDrillItem, TestDrillReadiness, TestDrillSummary, EnhancedTestDrill, SprintGroup, SprintProgress } from '@/app/types/test-drill.types';
+import type { TestDrill, TestDrillItem, TestDrillReadiness, TestDrillSummary, EnhancedTestDrill, SprintGroup, SprintProgress, TestDrillProgress } from '@/app/types/test-drill.types';
 import type { StudentPlan, StudentProgress } from '@/app/types/plan.types';
 import { getGC2TestDrills } from '@/app/data/gc2.test';
 import { getGC2TestDrillsEnhanced } from '@/app/data/gc2.test.enhanced';
+
+/**
+ * Helper function to extract lesson ID from slice ID
+ */
+export const getLessonIdFromSliceId = (sliceId: string): string => {
+  return sliceId.split('-').slice(0, 2).join('-');
+};
 
 // Registry of test drill data by curriculum ID
 const TEST_DRILL_REGISTRY: Record<string, TestDrill[]> = {
@@ -51,7 +58,7 @@ export const resolveTestDrillReferences = (drill: TestDrill, curriculum: Curricu
       const slice = findSliceById(curriculum, sliceId);
       if (slice) {
         slices.push(slice);
-        const lesson = curriculum.lessons.find(l => l.id === sliceId.split('-').slice(0, 2).join('-'));
+        const lesson = curriculum.lessons.find(l => l.id === getLessonIdFromSliceId(sliceId));
         if (lesson && !lessons.find(l => l.id === lesson.id)) {
           lessons.push(lesson);
         }
@@ -155,7 +162,7 @@ export const calculateTestDrillReadiness = (
     };
   }
 
-  const missingLessons: string[] = [];
+  const incompleteLessons = new Set<string>();
   let completedItems = 0;
   const totalItems = drill.items.length;
 
@@ -169,7 +176,7 @@ export const calculateTestDrillReadiness = (
         return;
       }
       
-      const lesson = curriculum.lessons.find(l => l.id === sliceId.split('-').slice(0, 2).join('-'));
+      const lesson = curriculum.lessons.find(l => l.id === getLessonIdFromSliceId(sliceId));
       if (!lesson) {
         itemCompleted = false;
         return;
@@ -178,7 +185,7 @@ export const calculateTestDrillReadiness = (
       // Check if lesson is in student's plan
       const isInPlan = studentPlan.lessonIds.includes(lesson.id);
       if (!isInPlan) {
-        missingLessons.push(lesson.id);
+        incompleteLessons.add(lesson.id);
         itemCompleted = false;
         return;
       }
@@ -186,16 +193,22 @@ export const calculateTestDrillReadiness = (
       // Check if lesson is completed
       const lessonProgress = studentProgress.lessons[lesson.id];
       if (!lessonProgress) {
+        incompleteLessons.add(lesson.id);
         itemCompleted = false;
         return;
       }
 
       // Check if the specific slice is completed
       const sliceIndex = lesson.slices.indexOf(slice);
-      const sliceProgress = lessonProgress.slices[sliceIndex];
+      if (sliceIndex < 0 || sliceIndex >= lessonProgress.slices.length) {
+        incompleteLessons.add(lesson.id);
+        itemCompleted = false;
+        return;
+      }
       
+      const sliceProgress = lessonProgress.slices[sliceIndex];
       if (!sliceProgress || !sliceProgress.steps.every(step => step.completed)) {
-        missingLessons.push(lesson.id);
+        incompleteLessons.add(lesson.id);
         itemCompleted = false;
       }
     });
@@ -206,12 +219,12 @@ export const calculateTestDrillReadiness = (
   });
 
   const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-  const isReady = missingLessons.length === 0 && completionPercentage === 100;
+  const isReady = incompleteLessons.size === 0 && completionPercentage === 100;
 
   return {
     drillNumber: drill.drillNumber,
     isReady,
-    missingLessons,
+    missingLessons: Array.from(incompleteLessons),
     completionPercentage
   };
 };
@@ -274,7 +287,7 @@ export const calculateSprintReadiness = (
       const slice = findSliceById(curriculum, sliceId);
       if (!slice) return false;
       
-      const lesson = curriculum.lessons.find(l => l.id === sliceId.split('-').slice(0, 2).join('-'));
+      const lesson = curriculum.lessons.find(l => l.id === getLessonIdFromSliceId(sliceId));
       if (!lesson) return false;
       
       const isInPlan = studentPlan.lessonIds.includes(lesson.id);
@@ -284,8 +297,11 @@ export const calculateSprintReadiness = (
       if (!lessonProgress) return false;
       
       const sliceIndex = lesson.slices.indexOf(slice);
-      const sliceProgress = lessonProgress.slices[sliceIndex];
+      if (sliceIndex < 0 || sliceIndex >= lessonProgress.slices.length) {
+        return false;
+      }
       
+      const sliceProgress = lessonProgress.slices[sliceIndex];
       return sliceProgress && sliceProgress.steps.every(step => step.completed);
     });
   });
@@ -332,7 +348,7 @@ export const calculateEnhancedTestDrillReadiness = (
  */
 export const getSprintProgress = (
   drill: EnhancedTestDrill,
-  testProgress: any // TestDrillProgress type
+  testProgress: TestDrillProgress
 ): SprintProgress[] => {
   return drill.sprintGroups.map(group => {
     const progress = testProgress.sprintProgress?.find((sp: SprintProgress) => sp.groupNumber === group.groupNumber);

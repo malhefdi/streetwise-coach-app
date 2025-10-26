@@ -50,7 +50,7 @@ const NextSessionCard: React.FC<NextSessionCardProps> = ({
           <Avatar 
             icon={icon}
             shape="circle"
-            size="small"
+            size="normal"
             className={bgColor}
           />
           <h4 className="sw-section-title">{title} ({items.length})</h4>

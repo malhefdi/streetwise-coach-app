@@ -10,8 +10,12 @@ import { ProgressBar } from 'primereact/progressbar';
 import { Chart } from 'primereact/chart';
 import { Divider } from 'primereact/divider';
 import { getCurriculum, getAllCurricula } from '@/app/data/curriculum';
+import { PRINCIPLES } from '@/app/data/principles.base';
 import { dataService } from '@/app/services/dataService';
 import type { Lesson, Slice } from '@/app/data/curriculum';
+import ActionBar from './components/ActionBar';
+import CoverageByPositionChart from './components/CoverageByPositionChart';
+import AnimatedBarChart from './components/AnimatedBarChart';
 
 
 
@@ -48,45 +52,76 @@ const DashboardPage = () => {
   const [averagePlanCompletion, setAveragePlanCompletion] = useState(0);
 
   useEffect(() => {
+    let mounted = true;
+
     const loadDashboardData = async () => {
-      setSessionMap(readLocalJSON<SessionMap>('coachSession_v2', {}));
-      setHasResume(!!localStorage.getItem('coachSession_v2'));
-      
-      // Load student and plan stats
-      const students = await dataService.getStudents();
-      setStudentsCount(students.length);
-      
-      const withPlans = students.filter(s => s.planId);
-      setStudentsWithPlans(withPlans.length);
-      
-      // Calculate average plan completion
-      if (withPlans.length > 0) {
-        let totalCompletion = 0;
-        for (const student of withPlans) {
-          const plan = await dataService.getStudentPlan(student.id);
-          const progress = await dataService.getStudentProgress(student.id);
-          
-          if (plan && progress) {
-            let completedLessons = 0;
-            plan.lessonIds.forEach(lessonId => {
-              const lessonProgress = progress.lessons[lessonId];
-              if (lessonProgress) {
-                // Check if lesson is fully completed
-                const allSteps = lessonProgress.slices.flatMap(s => s.steps || []);
-                const completedSteps = allSteps.filter(st => st.completed);
-                if (allSteps.length > 0 && completedSteps.length === allSteps.length) {
-                  completedLessons++;
+      try {
+        setSessionMap(readLocalJSON<SessionMap>('coachSession_v2', {}));
+        setHasResume(!!localStorage.getItem('coachSession_v2'));
+        
+        // Load student and plan stats
+        const students = await dataService.getStudents();
+        if (!mounted) return;
+        
+        setStudentsCount(students.length);
+        
+        const withPlans = students.filter(s => s.planId);
+        setStudentsWithPlans(withPlans.length);
+        
+        // Calculate average plan completion using parallel fetching
+        if (withPlans.length > 0) {
+          const studentDataPromises = withPlans.map(async (student) => {
+            try {
+              const [plan, progress] = await Promise.all([
+                dataService.getStudentPlan(student.id),
+                dataService.getStudentProgress(student.id)
+              ]);
+              return { plan, progress };
+            } catch (error) {
+              console.error(`Error loading data for student ${student.id}:`, error);
+              return { plan: null, progress: null };
+            }
+          });
+
+          const studentDataResults = await Promise.all(studentDataPromises);
+          if (!mounted) return;
+
+          let totalCompletion = 0;
+          let validStudents = 0;
+
+          studentDataResults.forEach(({ plan, progress }) => {
+            if (plan && progress) {
+              let completedLessons = 0;
+              plan.lessonIds.forEach(lessonId => {
+                const lessonProgress = progress.lessons[lessonId];
+                if (lessonProgress) {
+                  // Check if lesson is fully completed
+                  const allSteps = lessonProgress.slices.flatMap(s => s.steps || []);
+                  const completedSteps = allSteps.filter(st => st.completed);
+                  if (allSteps.length > 0 && completedSteps.length === allSteps.length) {
+                    completedLessons++;
+                  }
                 }
-              }
-            });
-            totalCompletion += (completedLessons / plan.lessonIds.length) * 100;
+              });
+              totalCompletion += (completedLessons / plan.lessonIds.length) * 100;
+              validStudents++;
+            }
+          });
+
+          if (validStudents > 0) {
+            setAveragePlanCompletion(Math.round(totalCompletion / validStudents));
           }
         }
-        setAveragePlanCompletion(Math.round(totalCompletion / withPlans.length));
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
       }
     };
     
     loadDashboardData();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const totalLessons = allLessons.length;
@@ -129,6 +164,19 @@ const DashboardPage = () => {
     };
   }, [allLessons]);
 
+  // Create principle data with IDs for radar chart
+  const principleRadarData = useMemo(() => {
+    return principleHeat.all.map(([name, count]) => {
+      // Find the principle ID from the PRINCIPLES array
+      const principle = PRINCIPLES.find(p => p.name === name);
+      return {
+        name,
+        count,
+        id: principle?.id || 0
+      };
+    });
+  }, [principleHeat.all]);
+
   // ---------- Small UI helpers ----------
   const QuickCard = ({
     icon,
@@ -156,115 +204,194 @@ const DashboardPage = () => {
     </Link>
   );
 
-  // ---------- View A: Coach Cockpit ----------
-  const CoachCockpit = () => (
-    <div>
-      <div className="flex flex-wrap gap-3 align-items-center justify-content-between mb-4">
-        <div>
-          <h2 className="m-0 text-2xl md:text-3xl font-bold">Coach Cockpit</h2>
-          <p className="m-0 text-sm text-color-secondary">
-            One-click access to sessions, students, and analytics.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {hasResume && (
-            <Link href="/coach" className="no-underline">
-              <Button label="Resume Session" icon="pi pi-play" severity="help" />
-            </Link>
-          )}
-          <Link href="/coach" className="no-underline">
-            <Button label="Start Coaching" icon="pi pi-bolt" severity="success" />
-          </Link>
-        </div>
-      </div>
+  // ---------- Main Dashboard View ----------
+  const MainDashboard = () => {
+    // Demo-ready data for MVP
+    const demoData = {
+      totalStudents: studentsCount || 5,
+      studentsWithPlans: studentsWithPlans || 3,
+      averageProgress: averagePlanCompletion || 31,
+      totalLessons: totalLessons || 68,
+      totalSlices: totalSlices || 142,
+      readyForTest: 2,
+      notTrainedThisWeek: 1,
+      mountPositionLagging: true
+    };
 
-      {/* KPIs */}
-      <div className="sw-card-grid mb-4">
-        <Card className="sw-card sw-card--kpi">
-          <div className="sw-card__label">Total Students</div>
-          <div className="sw-card__number">{studentsCount}</div>
-        </Card>
-        <Card className="sw-card sw-card--kpi">
-          <div className="sw-card__label">With Lesson Plans</div>
-          <div className="sw-card__number text-green-500">{studentsWithPlans}</div>
-          <div className="sw-card__subtext">
-            {studentsCount > 0 ? Math.round((studentsWithPlans / studentsCount) * 100) : 0}% of students
+    return (
+      <div>
+        {/* Hero Section */}
+        <div className="sw-hero-section">
+          <div className="sw-hero-content">
+            <h1 className="sw-hero-title">Coach Dashboard</h1>
+            <p className="sw-hero-subtitle">
+              One-click access to sessions, coaching stats, and students
+            </p>
+          </div>
+          
+          {/* Primary Action */}
+          <div className="sw-primary-action">
+            <Link href="/coach" className="no-underline">
+              <Button 
+                label="Start Coaching" 
+                icon="pi pi-play" 
+                className="sw-hero-button"
+                size="large"
+              />
+            </Link>
+          </div>
+
+          {/* Secondary Actions */}
+          <div className="sw-secondary-actions">
+            <Link href="/students" className="no-underline">
+              <Button 
+                label="View Students" 
+                icon="pi pi-users" 
+                className="sw-secondary-button"
+                outlined
+              />
+            </Link>
+            <Link href="/curriculum" className="no-underline">
+              <Button 
+                label="View Curriculum" 
+                icon="pi pi-book" 
+                className="sw-secondary-button"
+                outlined
+              />
+            </Link>
+            <Link href="/session-history" className="no-underline">
+              <Button 
+                label="Session History" 
+                icon="pi pi-history" 
+                className="sw-secondary-button"
+                outlined
+              />
+            </Link>
+            <Link href="/analytics" className="no-underline">
+              <Button 
+                label="Analytics" 
+                icon="pi pi-chart-bar" 
+                className="sw-secondary-button"
+                outlined
+              />
+            </Link>
+          </div>
+        </div>
+
+        {/* KPI Cards - 2x2 Grid */}
+        <div className="sw-kpi-grid">
+          <Card className="sw-kpi-card">
+            <div className="sw-kpi-content">
+              <div className="sw-kpi-number">{demoData.totalStudents}</div>
+              <div className="sw-kpi-label">Total Students</div>
+              <div className="sw-kpi-subtitle">Active roster</div>
+            </div>
+            <div className="sw-kpi-icon">
+              <i className="pi pi-users text-blue-500"></i>
+            </div>
+          </Card>
+
+          <Card className="sw-kpi-card">
+            <div className="sw-kpi-content">
+              <div className="sw-kpi-number text-green-500">{demoData.studentsWithPlans}</div>
+              <div className="sw-kpi-label">With Lesson Plans</div>
+              <div className="sw-kpi-subtitle">
+                {Math.round((demoData.studentsWithPlans / demoData.totalStudents) * 100)}% of students
+              </div>
+            </div>
+            <div className="sw-kpi-icon">
+              <i className="pi pi-check-circle text-green-500"></i>
+            </div>
+          </Card>
+
+          <Card className="sw-kpi-card">
+            <div className="sw-kpi-content">
+              <div className="sw-kpi-number text-orange-500">{demoData.averageProgress}%</div>
+              <div className="sw-kpi-label">Avg. Progress</div>
+              <div className="sw-kpi-subtitle">Across all plans</div>
+            </div>
+            <div className="sw-kpi-icon">
+              <i className="pi pi-chart-line text-orange-500"></i>
+            </div>
+          </Card>
+
+          <Card className="sw-kpi-card">
+            <div className="sw-kpi-content">
+              <div className="sw-kpi-number text-purple-500">{demoData.totalLessons}</div>
+              <div className="sw-kpi-label">Total Lessons</div>
+              <div className="sw-kpi-subtitle">{demoData.totalSlices} slices available</div>
+            </div>
+            <div className="sw-kpi-icon">
+              <i className="pi pi-book text-purple-500"></i>
+            </div>
+          </Card>
+        </div>
+
+        {/* Coaching Insights */}
+        <Card className="sw-insights-card">
+          <div className="sw-insights-header">
+            <h3 className="sw-insights-title">
+              <i className="pi pi-lightbulb text-yellow-500"></i>
+              Coaching Insights
+            </h3>
+          </div>
+          <div className="sw-insights-content">
+            <div className="sw-insight-item">
+              <i className="pi pi-star text-green-500"></i>
+              <span>{demoData.readyForTest} students ready for belt test</span>
+            </div>
+            <div className="sw-insight-item">
+              <i className="pi pi-clock text-orange-500"></i>
+              <span>{demoData.notTrainedThisWeek} student hasn't trained this week</span>
+            </div>
+            <div className="sw-insight-item">
+              <i className="pi pi-exclamation-triangle text-red-500"></i>
+              <span>Mount position needs more focus</span>
+            </div>
           </div>
         </Card>
-        <Card className="sw-card sw-card--kpi">
-          <div className="sw-card__label">Avg. Plan Progress</div>
-          <div className="sw-card__number text-blue-500">{averagePlanCompletion}%</div>
-          <div className="sw-card__subtext">Across all plans</div>
-        </Card>
-        <Card className="sw-card sw-card--kpi">
-          <div className="sw-card__label">Total Lessons</div>
-          <div className="sw-card__number">{totalLessons}</div>
-          <div className="sw-card__subtext">{totalSlices} slices</div>
-        </Card>
-      </div>
 
-      {/* Quick Links */}
-      <div className="sw-card-grid mt-2">
-        <QuickCard icon="pi-users" title="Students" sub="Roster" href="/students" color="primary" />
-        <QuickCard icon="pi-book" title="Curriculum" sub={`${allCurricula.length} Programs`} href="/curriculum" color="success" />
-        <QuickCard icon="pi-chart-bar" title="Analytics" sub="Trends" href="/analytics" color="warning" />
-        <QuickCard icon="pi-history" title="Session History" sub="Reports" href="/session-history" color="help" />
-      </div>
-
-      <Divider className="my-4" />
-
-      {/* Curriculum Coverage */}
-      <div className="grid">
-        <div className="col-12 md:col-8">
-          <Card className="sw-card sw-card--elevated">
-            <div className="sw-card__header">
-              <h3 className="sw-card__title">Curriculum Coverage</h3>
-            </div>
-            <div className="sw-card__content">
-              {positionCounts.map(({ position, count }) => {
-                const percent = Math.round((count / totalLessons) * 100);
-                return (
-                  <div key={position} className="mb-3">
-                    <div className="flex justify-content-between mb-1">
-                      <span className="font-medium">{position}</span>
-                      <span className="text-color-secondary">{count} lessons</span>
-                    </div>
-                    <ProgressBar value={percent} showValue className="sw-progress sw-progress--thick" pt={{ value: { style: gradientStyle } }} />
+        {/* Charts Section - Only show if students exist */}
+        {demoData.totalStudents > 0 && (
+          <div className="sw-charts-section">
+            <div className="grid">
+              <div className="col-12 md:col-8">
+                <Card className="sw-chart-card">
+                  <div className="sw-chart-header">
+                    <h3 className="sw-chart-title">Coverage by Position</h3>
                   </div>
-                );
-              })}
-            </div>
-          </Card>
-        </div>
+                  <div className="sw-chart-content">
+                    <CoverageByPositionChart 
+                      data={positionCounts.map(({ position, count }) => ({
+                        position,
+                        count,
+                        percentage: Math.round((count / totalLessons) * 100)
+                      }))}
+                      totalLessons={totalLessons}
+                    />
+                  </div>
+                </Card>
+              </div>
 
-        <div className="col-12 md:col-4">
-          <Card className="sw-card sw-card--elevated">
-            <div className="sw-card__header">
-              <h3 className="sw-card__title">Principles Heat</h3>
+              <div className="col-12 md:col-4">
+                <Card className="sw-chart-card">
+                  <div className="sw-chart-header">
+                    <h3 className="sw-chart-title">Principles Race</h3>
+                    <p className="sw-chart-subtitle">Usage Rankings</p>
+                  </div>
+                  <div className="sw-chart-content">
+                    <AnimatedBarChart 
+                      data={principleRadarData}
+                    />
+                  </div>
+                </Card>
+              </div>
             </div>
-            <div className="sw-card__content">
-              <Chart
-                type="bar"
-                data={{
-                  labels: principleHeat.top8.map(([k]) => k),
-                  datasets: [{ data: principleHeat.top8.map(([, v]) => v), borderWidth: 1 }],
-                }}
-                options={{
-                  plugins: { legend: { display: false } },
-                  scales: {
-                    x: { ticks: { color: 'var(--text-color)' } },
-                    y: { ticks: { color: 'var(--text-color)' } },
-                  },
-                  maintainAspectRatio: false,
-                }}
-                style={{ height: '260px' }}
-              />
-            </div>
-          </Card>
-        </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // ---------- View B: Curriculum Map ----------
   const CurriculumMap = () => {
@@ -328,16 +455,9 @@ const DashboardPage = () => {
     );
   };
 
-  // ---------- Tabs ----------
-  const tabs = [
-    { label: 'Coach Cockpit', icon: 'pi pi-compass' },
-    { label: 'Curriculum Map', icon: 'pi pi-sitemap' },
-  ];
-
   return (
-    <div className="page-wrapper p-4 md:p-5">
-      <TabMenu model={tabs} activeIndex={activeIndex} onTabChange={(e) => setActiveIndex(e.index)} className="mb-4" />
-      {activeIndex === 0 ? <CoachCockpit /> : <CurriculumMap />}
+    <div className="page-wrapper sw-dashboard-full-width">
+      <MainDashboard />
       <style jsx global>{`
         .sw-hover-card:hover {
           transform: translateY(-4px);

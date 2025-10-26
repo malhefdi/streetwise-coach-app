@@ -71,7 +71,7 @@ const SprintGroupDisplay: React.FC<SprintGroupDisplayProps> = ({
             {sprintGroup.restTimeMinutes > 0 && (
               <Tag 
                 value={`${sprintGroup.restTimeMinutes}m rest`} 
-                severity="secondary" 
+                severity="info" 
                 icon="pi pi-pause" 
               />
             )}
@@ -182,7 +182,7 @@ const TestDrillTrackerEnhanced: React.FC<TestDrillTrackerEnhancedProps> = ({
             </div>
             <div className="flex align-items-center gap-2 mt-1">
               <Tag value={`${drill.timeLimitMinutes}m`} severity="info" icon="pi pi-clock" />
-              <Tag value={`${readySprints}/${totalSprints} sprints`} severity="secondary" icon="pi pi-list" />
+              <Tag value={`${readySprints}/${totalSprints} sprints`} severity="info" icon="pi pi-list" />
               {getReadinessBadge(readiness)}
             </div>
           </div>

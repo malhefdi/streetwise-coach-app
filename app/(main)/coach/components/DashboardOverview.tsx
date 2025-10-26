@@ -257,7 +257,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   <div className="text-sm text-color-secondary">{student.rank}</div>
                 </div>
                 <Tag 
-                  value={student.status.replace('-', ' ')}
+                  value={student.status.replace(/-/g, ' ')}
                   severity={getStatusColor(student.status)}
                   className="text-xs"
                 />

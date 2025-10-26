@@ -3,19 +3,22 @@ export interface Step {
   id: string;
   stepNumber: number;
   description: string;
+  importance?: string;
+  confidence?: number;
+  notes?: string;
 }
 
 export interface Slice {
   id: string;
   sliceNumber: number;
   title: string;
-  indicator?: string;
-  essentialDetail?: string;
-  mostCommonMistake?: string;
-  badGuyReminder?: string;
-  safetyTip?: string;
-  corePrinciples?: string[];
-  drillOrders?: string;
+  indicator?: string | null;
+  essentialDetail?: string | null;
+  mostCommonMistake?: string | null;
+  badGuyReminder?: string | null;
+  safetyTip?: string | null;
+  corePrinciples?: string[] | null;
+  drillOrders?: string | null;
   isBonusSlice?: boolean;
   steps?: Step[];
 }
@@ -25,17 +28,17 @@ export interface Lesson {
   lessonNumber: number;
   technique: string;
   position: string;
-  overview?: string;
-  mindsetMinute?: string;
-  streetTip?: string;
+  overview?: string | null;
+  mindsetMinute?: string | null;
+  streetTip?: string | null;
   // Chapter metadata (for BBS1 and future curricula)
-  chapterId?: string; // e.g., "bbs1-c1", "bbs1-c2"
-  chapterTitle?: string; // e.g., "Mount", "Side Mount"
-  chapter?: string; // e.g., "1.1: Mount Controls" - subchapter
-  course?: string; // e.g., "Master Cycle | Blue Belt Stripe 1"
+  chapterId?: string | null; // e.g., "bbs1-c1", "bbs1-c2"
+  chapterTitle?: string | null; // e.g., "Mount", "Side Mount"
+  chapter?: string | null; // e.g., "1.1: Mount Controls" - subchapter
+  course?: string | null; // e.g., "Master Cycle | Blue Belt Stripe 1"
   // Advanced sparring drills (for BBS1 and future curricula)
-  rapidMasteryDrill?: string;
-  focusSparring?: string;
+  rapidMasteryDrill?: string | null;
+  focusSparring?: string | null;
   slices: Slice[];
 }
 

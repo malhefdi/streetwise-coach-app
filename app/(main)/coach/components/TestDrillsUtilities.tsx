@@ -13,12 +13,12 @@ import type { Student } from '@/app/types/student.types';
 import type { TestDrillReadiness, TestDrill } from '@/app/types/test-drill.types';
 
 interface StudentWithTestData extends Student {
-  testReadiness: TestDrillReadiness[];
+  testReadiness?: TestDrillReadiness[];
   curriculumId: string;
 }
 
 interface TestDrillsUtilitiesProps {
-  student?: Student | null;
+  student?: StudentWithTestData | null;
   allStudents: StudentWithTestData[];
   testDrills: TestDrill[];
   onStartTest: (studentId: string, drillNumber: number) => void;
@@ -39,8 +39,8 @@ const TestDrillsUtilities: React.FC<TestDrillsUtilitiesProps> = ({
 
   const studentsToShow = student ? [student] : allStudents;
   const totalDrills = testDrills.length;
-  const studentsWithReadyDrills = studentsToShow.filter(s => s.testReadiness.some(r => r.isReady)).length;
-  const totalReadyDrills = studentsToShow.reduce((sum, s) => sum + s.testReadiness.filter(r => r.isReady).length, 0);
+  const studentsWithReadyDrills = studentsToShow.filter(s => (s.testReadiness ?? []).some(r => r.isReady)).length;
+  const totalReadyDrills = studentsToShow.reduce((sum, s) => sum + (s.testReadiness ?? []).filter(r => r.isReady).length, 0);
   const averageReadiness = studentsToShow.length > 0 
     ? Math.round((totalReadyDrills / (studentsToShow.length * totalDrills)) * 100) 
     : 0;
@@ -60,8 +60,8 @@ const TestDrillsUtilities: React.FC<TestDrillsUtilitiesProps> = ({
   };
 
   const readinessCellTemplate = (rowData: StudentWithTestData, drillNumber: number) => {
-    const readiness = rowData.testReadiness.find(r => r.drillNumber === drillNumber);
-    if (!readiness) return <Tag value="N/A" severity="secondary" className="text-xs" />;
+    const readiness = (rowData.testReadiness ?? []).find(r => r.drillNumber === drillNumber);
+    if (!readiness) return <Tag value="N/A" severity="info" className="text-xs" />;
 
     return (
       <div className="text-center">
@@ -100,7 +100,7 @@ const TestDrillsUtilities: React.FC<TestDrillsUtilitiesProps> = ({
   const selectedStudent = selectedDrill ? studentsToShow.find(s => s.id === selectedDrill.studentId) : null;
   const selectedDrillData = selectedDrill ? testDrills.find(d => d.drillNumber === selectedDrill.drillNumber) : null;
   const selectedReadiness = selectedDrill && selectedStudent 
-    ? selectedStudent.testReadiness.find(r => r.drillNumber === selectedDrill.drillNumber)
+    ? (selectedStudent.testReadiness ?? []).find(r => r.drillNumber === selectedDrill.drillNumber)
     : null;
 
   return (
@@ -161,9 +161,9 @@ const TestDrillsUtilities: React.FC<TestDrillsUtilitiesProps> = ({
             size="small"
             severity="success"
             onClick={() => {
-              const readyStudent = studentsToShow.find(s => s.testReadiness.some(r => r.isReady));
+              const readyStudent = studentsToShow.find(s => (s.testReadiness ?? []).some(r => r.isReady));
               if (readyStudent) {
-                const readyDrill = readyStudent.testReadiness.find(r => r.isReady);
+                const readyDrill = (readyStudent.testReadiness ?? []).find(r => r.isReady);
                 if (readyDrill) {
                   onStartTest(readyStudent.id, readyDrill.drillNumber);
                 }
@@ -177,9 +177,9 @@ const TestDrillsUtilities: React.FC<TestDrillsUtilitiesProps> = ({
             size="small"
             outlined
             onClick={() => {
-              const readyStudent = studentsToShow.find(s => s.testReadiness.some(r => r.isReady));
+              const readyStudent = studentsToShow.find(s => (s.testReadiness ?? []).some(r => r.isReady));
               if (readyStudent) {
-                const readyDrill = readyStudent.testReadiness.find(r => r.isReady);
+                const readyDrill = (readyStudent.testReadiness ?? []).find(r => r.isReady);
                 if (readyDrill) {
                   onPrintChecklist(readyStudent.id, readyDrill.drillNumber);
                 }
@@ -211,9 +211,9 @@ const TestDrillsUtilities: React.FC<TestDrillsUtilitiesProps> = ({
               key={drill.drillNumber}
               header={
                 <div className="flex justify-content-between align-items-center w-full">
-                  <span className="font-semibold">Drill {drill.drillNumber}: {drill.name}</span>
+                  <span className="font-semibold">Drill {drill.drillNumber}: {drill.title}</span>
                   <Tag 
-                    value={`${studentsToShow.filter(s => s.testReadiness.find(r => r.drillNumber === drill.drillNumber)?.isReady).length}/${studentsToShow.length} ready`}
+                    value={`${studentsToShow.filter(s => (s.testReadiness ?? []).find(r => r.drillNumber === drill.drillNumber)?.isReady).length}/${studentsToShow.length} ready`}
                     severity="info"
                     className="text-xs"
                   />
@@ -224,16 +224,16 @@ const TestDrillsUtilities: React.FC<TestDrillsUtilitiesProps> = ({
                 <div className="col-12 md:col-6">
                   <h6 className="mb-2">Drill Information</h6>
                   <div className="space-y-2">
-                    <div><strong>Name:</strong> {drill.name}</div>
-                    <div><strong>Estimated Time:</strong> {drill.estimatedTime || '5 minutes'}</div>
-                    <div><strong>Instructions:</strong> {drill.instructions || 'Demonstrate all techniques in order'}</div>
+                    <div><strong>Name:</strong> {drill.title}</div>
+                    <div><strong>Time Limit:</strong> {drill.timeLimitMinutes || 5} minutes</div>
+                    <div><strong>Description:</strong> {drill.description || 'Demonstrate all techniques in order'}</div>
                   </div>
                 </div>
                 <div className="col-12 md:col-6">
                   <h6 className="mb-2">Student Readiness</h6>
                   <div className="space-y-2">
                     {studentsToShow.map(student => {
-                      const readiness = student.testReadiness.find(r => r.drillNumber === drill.drillNumber);
+                      const readiness = (student.testReadiness ?? []).find(r => r.drillNumber === drill.drillNumber);
                       return (
                         <div key={student.id} className="flex justify-content-between align-items-center p-2 surface-100 border-round">
                           <span className="text-sm">{student.name}</span>
@@ -282,7 +282,7 @@ const TestDrillsUtilities: React.FC<TestDrillsUtilitiesProps> = ({
           <div>
             <div className="mb-3">
               <h6>Drill Information</h6>
-              <p><strong>Name:</strong> {selectedDrillData.name}</p>
+              <p><strong>Name:</strong> {selectedDrillData.title}</p>
               <p><strong>Student:</strong> {selectedStudent.name}</p>
               <p><strong>Readiness:</strong> 
                 <Tag 
@@ -297,7 +297,7 @@ const TestDrillsUtilities: React.FC<TestDrillsUtilitiesProps> = ({
               <div className="mb-3">
                 <h6>Missing Prerequisites</h6>
                 <div className="flex flex-wrap gap-1">
-                  {selectedReadiness.missingLessons.map(lessonId => (
+                  {selectedReadiness.missingLessons.map((lessonId: string) => (
                     <Tag key={lessonId} value={lessonId} severity="danger" className="text-xs" />
                   ))}
                 </div>

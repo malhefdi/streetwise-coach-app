@@ -14,10 +14,11 @@ $cardGapSm: 0.75rem;            /* small gap between cards */
 $cardGapLg: 1.5rem;             /* large gap between cards */
 
 /* Shadow System */
-$shadowSm: 0 2px 8px rgba(0, 0, 0, 0.15);
-$shadowMd: 0 4px 16px rgba(0, 0, 0, 0.2);
-$shadowLg: 0 8px 32px rgba(0, 0, 0, 0.25);
-$shadowXl: 0 16px 48px rgba(0, 0, 0, 0.3);
+$shadow-color: #000000;              /* Shadow color - can be themed */
+$shadowSm: 0 2px 8px rgba($shadow-color, 0.15);
+$shadowMd: 0 4px 16px rgba($shadow-color, 0.2);
+$shadowLg: 0 8px 32px rgba($shadow-color, 0.25);
+$shadowXl: 0 16px 48px rgba($shadow-color, 0.3);
 
 /* Typography Scale */
 $fontSizeXs: 0.75rem;           /* 12px */

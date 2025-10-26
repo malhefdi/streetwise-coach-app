@@ -1,36 +1,16 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { Card } from 'primereact/card';
-import { DataTable, DataTableSortEvent } from 'primereact/datatable';
-import { Column } from 'primereact/column';
-import { Button } from 'primereact/button';
-import { Tag } from 'primereact/tag';
-import { InputText } from 'primereact/inputtext';
-import { SelectButton, SelectButtonChangeEvent } from 'primereact/selectbutton';
-import { Dropdown } from 'primereact/dropdown';
-import { getCurriculum, getAllCurricula } from '@/app/data/curriculum';
-import type { Lesson, Slice } from '@/app/data/curriculum';
-import LessonDetailModal from './components/LessonDetailModal';
 
-// ---------- Principle severity mapping (subtle colors) ----------
-const getPrincipleSeverity = (principle: string): 'info' | 'success' | 'warning' | 'danger' => {
-  const principleName = principle.split(' (')[0];
-  
-  // Group principles by category for consistent, subtle coloring
-  const corePrinciples = ['Connection', 'Distance', 'Pyramid', 'Creation', 'Acceptance'];
-  const movementPrinciples = ['Velocity', 'Clock', 'River', 'Frame', 'Kuzushi'];
-  const controlPrinciples = ['Reconnaissance', 'Prevention', 'Tension', 'Fork', 'Posture'];
-  const advancedPrinciples = ['False Surrender', 'Depletion', 'Isolation', 'Sacrifice', 'Momentum'];
-  const specializedPrinciples = ['Pivot', 'Tagalong', 'Overload', 'Anchor', 'Ratchet'];
-  
-  if (corePrinciples.includes(principleName)) return 'success';
-  if (movementPrinciples.includes(principleName)) return 'info';
-  if (controlPrinciples.includes(principleName)) return 'warning';
-  if (advancedPrinciples.includes(principleName)) return 'danger';
-  if (specializedPrinciples.includes(principleName)) return 'info';
-  
-  return 'info'; // Default for any unmapped principles
-};
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card } from 'primereact/card';
+import { Button } from 'primereact/button';
+import { Dialog } from 'primereact/dialog';
+import { Tag } from 'primereact/tag';
+import { getCurriculum, getAllCurricula } from '@/app/data/curriculum';
+import type { Lesson } from '@/app/data/curriculum';
+import CompactStatsBar from './components/CompactStatsBar';
+import MinimalFilterBar from './components/MinimalFilterBar';
+import OptimizedLessonCard from './components/OptimizedLessonCard';
+import LessonCard from './components/LessonCard'; // Keep for fullscreen dialog
 
 const CurriculumPage = () => {
   // ----- curriculum selection -----
@@ -39,311 +19,343 @@ const CurriculumPage = () => {
   const curriculum = getCurriculum(selectedCurriculumId);
   const [lessons, setLessons] = useState<Lesson[]>(curriculum?.lessons || []);
 
+  // ----- filters -----
+  const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
+  const [showFullscreen, setShowFullscreen] = useState(false);
+  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+
   // Update lessons when curriculum changes
   useEffect(() => {
     setLessons(curriculum?.lessons || []);
   }, [curriculum]);
 
-  // ----- table state -----
-  const [expandedRows, setExpandedRows] = useState<{ [key: string]: boolean }>({});
-  const [globalFilter, setGlobalFilter] = useState('');
-  const [sortField, setSortField] = useState<'lesson' | 'position'>('lesson');
-  const [sortOrder, setSortOrder] = useState<1 | 0 | -1 | null>(1);
-  
-  // Modal state for mobile
-  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
-  const [showLessonModal, setShowLessonModal] = useState(false);
+  // ----- insights data -----
+  const insightsData = useMemo(() => {
+    if (!lessons.length) return { 
+      totalLessons: 0, 
+      totalSlices: 0, 
+      avgSteps: 0, 
+      positionsCovered: 0 
+    };
 
-  const sortOptions = [
-    { icon: 'pi pi-sort-numeric-down', value: 'lesson' },
-    { icon: 'pi pi-sort-alpha-down', value: 'position' }
-  ];
+    const totalSlices = lessons.reduce((acc, lesson) => acc + (lesson.slices?.length || 0), 0);
+    const totalSteps = lessons.reduce((acc, lesson) => 
+      acc + (lesson.slices?.reduce((sliceAcc, slice) => sliceAcc + (slice.steps?.length || 1), 0) || 0), 0
+    );
+    
+    // Count unique positions
+    const uniquePositions = new Set(lessons.map(lesson => lesson.position || 'Unknown'));
+    
+    return {
+      totalLessons: lessons.length,
+      totalSlices,
+      avgSteps: lessons.length > 0 ? Math.round(totalSteps / lessons.length) : 0,
+      positionsCovered: uniquePositions.size
+    };
+  }, [lessons]);
 
-  // ----- header with switcher -----
+  // ----- filtered lessons -----
+  const filteredLessons = useMemo(() => {
+    let filtered = lessons;
+
+    // Position filter
+    if (selectedPositions.length > 0) {
+      filtered = filtered.filter(lesson => 
+        selectedPositions.includes(lesson.position || 'Unknown')
+      );
+    }
+
+    return filtered;
+  }, [lessons, selectedPositions]);
+
+  // ----- unique positions for filter -----
+  const uniquePositions = useMemo(() => {
+    const positions = new Set(lessons.map(lesson => lesson.position || 'Unknown'));
+    return Array.from(positions).map(position => ({ label: position, value: position }));
+  }, [lessons]);
+
+  // ----- curriculum options -----
   const curriculumOptions = allCurricula.map(curriculum => ({
     label: curriculum.name,
     value: curriculum.id
   }));
 
-  const header = (
-    <div className="flex justify-content-between align-items-center flex-wrap gap-2">
-      <div className="flex align-items-center gap-3">
-        <h5 className="m-0">{curriculum?.name || 'Curriculum'}</h5>
-        <Dropdown
-          value={selectedCurriculumId}
-          onChange={(e) => setSelectedCurriculumId(e.value)}
-          options={curriculumOptions}
-          placeholder="Select Curriculum"
-          className="w-20rem"
-        />
-      </div>
-      <div className="flex align-items-center gap-2">
-        <SelectButton
-          value={sortField}
-          options={sortOptions}
-          onChange={(e: SelectButtonChangeEvent) => e.value && (setSortField(e.value), setSortOrder(1))}
-          optionLabel="value"
-          itemTemplate={(option) => <i className={option.icon}></i>}
-        />
-        <span className="p-input-icon-left">
-          <i className="pi pi-search" />
-          <InputText type="search" onInput={(e) => setGlobalFilter(e.currentTarget.value)} placeholder="Search..." />
-        </span>
-      </div>
-    </div>
-  );
-
-  // Handle row click - open modal on mobile, expand inline on desktop
-  const handleRowClick = (lesson: Lesson) => {
-    // On mobile, open modal; on desktop, use inline expansion
-    const isMobile = window.innerWidth <= 768;
-    if (isMobile) {
-      setSelectedLesson(lesson);
-      setShowLessonModal(true);
-    }
+  // ----- handlers -----
+  const handleViewFullscreen = (lesson: Lesson) => {
+    setSelectedLesson(lesson);
+    setShowFullscreen(true);
   };
 
-  // ----- row expansion template -----
-  const rowExpansionTemplate = (data: Lesson) => (
-    <div className="p-4 surface-ground">
-      {/* Lesson Header Section */}
-      <Card className="mb-4 shadow-3">
-        <div className="flex align-items-start gap-3 mb-3">
-          <i className="pi pi-book text-4xl text-primary"></i>
-          <div className="flex-1">
-            <h4 className="m-0 mb-2 text-primary font-bold">Lesson {data.lessonNumber}: {data.technique}</h4>
-            {data.overview && (
-              <div className="mb-3">
-                <div className="flex align-items-center gap-2 mb-2">
-                  <i className="pi pi-info-circle text-primary"></i>
-                  <span className="font-semibold text-primary">Overview</span>
-                </div>
-                <p className="m-0 text-color-secondary line-height-3 pl-4">{data.overview}</p>
-              </div>
-            )}
-            
-            {/* Mindset Minute */}
-            {data.mindsetMinute && (
-              <div className="mb-3 p-3 surface-100 border-round-lg border-left-3 border-primary">
-                <div className="flex align-items-center gap-2 mb-2">
-                  <i className="pi pi-lightbulb text-orange-500 text-xl"></i>
-                  <span className="font-semibold text-orange-500">Mindset Minute</span>
-                </div>
-                <p className="m-0 text-sm line-height-3">{data.mindsetMinute}</p>
-              </div>
-            )}
-            
-            {/* Street Tip */}
-            {data.streetTip && (
-              <div className="p-3 surface-100 border-round-lg border-left-3 border-cyan-500">
-                <div className="flex align-items-center gap-2 mb-2">
-                  <i className="pi pi-shield text-cyan-500 text-xl"></i>
-                  <span className="font-semibold text-cyan-500">Street Tip</span>
-                </div>
-                <p className="m-0 text-sm line-height-3">{data.streetTip}</p>
-              </div>
-            )}
+  const handlePositionToggle = (position: string) => {
+    setSelectedPositions(prev => 
+      prev.includes(position) 
+        ? prev.filter(p => p !== position)
+        : [...prev, position]
+    );
+  };
+
+  const clearFilters = () => {
+    setSelectedPositions([]);
+  };
+
+  const hasActiveFilters = selectedPositions.length > 0;
+
+  return (
+    <div className="page-wrapper p-4">
+      {/* Page Header */}
+      <div className="sw-page-header">
+        <h1 className="title-text">Curriculum</h1>
+        <p className="sw-page-subtitle">
+          Browse and explore lesson content across all programs.
+        </p>
+      </div>
+
+      {/* Compact Stats Bar */}
+      <CompactStatsBar
+        totalLessons={insightsData.totalLessons}
+        totalSlices={insightsData.totalSlices}
+        avgSteps={insightsData.avgSteps}
+        positionsCovered={insightsData.positionsCovered}
+      />
+
+      {/* Minimal Filter Bar */}
+      <MinimalFilterBar
+        selectedCurriculumId={selectedCurriculumId}
+        curriculumOptions={curriculumOptions}
+        selectedPositions={selectedPositions}
+        uniquePositions={uniquePositions}
+        globalFilter=""
+        onCurriculumChange={setSelectedCurriculumId}
+        onPositionToggle={handlePositionToggle}
+        onSearchChange={() => {}}
+      />
+
+      {/* Empty State for No Lessons */}
+      {filteredLessons.length === 0 && lessons.length > 0 && (
+        <div className="sw-empty-state">
+          <div className="sw-empty-state__icon">
+            <i className="pi pi-filter"></i>
+          </div>
+          <div className="sw-empty-state__title">No lessons match your filters</div>
+          <div className="sw-empty-state__description">
+            Try adjusting your position filters or clearing them to see all lessons.
+          </div>
+          <div className="sw-empty-state__action">
+            <Button
+              label="Clear Filters"
+              icon="pi pi-times"
+              className="sw-button sw-button--primary"
+              onClick={clearFilters}
+            />
           </div>
         </div>
-      </Card>
+      )}
 
-      {/* Slices Section */}
-      <div className="mb-2">
-        <h5 className="text-lg font-semibold mb-3 flex align-items-center gap-2">
-          <i className="pi pi-th-large text-primary"></i>
-          Technique Slices
-        </h5>
-      </div>
-      
-      <div className="grid">
-        {data.slices.map((slice, index) => (
-          <div key={slice.id || index} className="col-12 lg:col-6">
-            <Card className="h-full shadow-2 hover:shadow-4 transition-duration-200">
-              {/* Slice Header */}
-              <div className="flex justify-content-between align-items-start mb-3 pb-3 border-bottom-1 surface-border">
-                <div className="flex-1">
-                  <div className="flex align-items-center gap-2 mb-1">
-                    <Tag value={`Slice ${slice.sliceNumber}`} severity="info" className="font-semibold" />
-                    {slice.isBonusSlice && <Tag value="BONUS" severity="warning" icon="pi pi-star" />}
-                  </div>
-                  <h6 className="m-0 mt-2 font-bold text-lg">{slice.title}</h6>
-                </div>
-              </div>
-
-              {/* Essential Detail */}
-              {slice.essentialDetail && (
-                <div className="mb-3">
-                  <div className="flex align-items-center gap-2 mb-2">
-                    <i className="pi pi-check-circle text-green-500"></i>
-                    <span className="font-semibold text-green-600">Essential Detail</span>
-                  </div>
-                  <p className="m-0 text-sm pl-4 line-height-3">{slice.essentialDetail}</p>
-                </div>
-              )}
-
-              {/* Most Common Mistake */}
-              {slice.mostCommonMistake && (
-                <div className="mb-3 p-2 surface-50 border-round-md border-left-2 border-red-400">
-                  <div className="flex align-items-center gap-2 mb-1">
-                    <i className="pi pi-exclamation-triangle text-red-500"></i>
-                    <span className="font-semibold text-red-600 text-sm">Most Common Mistake</span>
-                  </div>
-                  <p className="m-0 text-sm pl-4 line-height-3">{slice.mostCommonMistake}</p>
-                </div>
-              )}
-
-              {/* Safety Tip */}
-              {slice.safetyTip && (
-                <div className="mb-3 p-2 surface-50 border-round-md border-left-2 border-orange-400">
-                  <div className="flex align-items-center gap-2 mb-1">
-                    <i className="pi pi-shield text-orange-500"></i>
-                    <span className="font-semibold text-orange-600 text-sm">Safety Tip</span>
-                  </div>
-                  <p className="m-0 text-sm pl-4 line-height-3">{slice.safetyTip}</p>
-                </div>
-              )}
-
-              {/* Principles */}
-              {slice.corePrinciples && slice.corePrinciples.length > 0 && (
-                <div className="mt-3 pt-3 border-top-1 surface-border">
-                  <div className="flex align-items-center gap-2 mb-2">
-                    <i className="pi pi-compass text-indigo-500"></i>
-                    <span className="font-semibold text-sm">Core Principles</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {slice.corePrinciples.map((p, i) => (
-                      <Tag 
-                        key={`${slice.id}-${i}`} 
-                        value={p.split(' (')[0]} 
-                        severity={getPrincipleSeverity(p)}
-                        className="text-xs"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </Card>
+      {/* No Curriculum Data */}
+      {lessons.length === 0 && (
+        <div className="sw-empty-state">
+          <div className="sw-empty-state__icon">
+            <i className="pi pi-book"></i>
           </div>
-        ))}
-      </div>
-    </div>
-  );
+          <div className="sw-empty-state__title">No curriculum data available</div>
+          <div className="sw-empty-state__description">
+            There are no lessons in the selected curriculum program.
+          </div>
+        </div>
+      )}
 
-  // ----- render -----
-  return (
-    <div className="card" style={{ height: 'calc(100vh - 10rem)', display: 'flex', flexDirection: 'column' }}>
-      <Card className="mb-3">{header}</Card>
-      
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <DataTable
-          value={lessons}
-          dataKey="id"
-          expandedRows={expandedRows}
-          onRowToggle={(e) => {
-            setExpandedRows(e.data as { [key: string]: boolean });
-          }}
-          rowExpansionTemplate={rowExpansionTemplate}
-          scrollable
-          scrollHeight="flex"
-          virtualScrollerOptions={{ itemSize: 46 }}
-          globalFilter={globalFilter}
-        >
-          <Column 
-            expander 
-            style={{ width: '3em' }} 
-            headerStyle={{ textAlign: 'center' }}
-            bodyStyle={{ textAlign: 'center' }}
-          />
-          <Column 
-            field="lessonNumber" 
-            header="Class #" 
-            sortable
-            body={(rowData: Lesson) => (
-              <div onClick={() => handleRowClick(rowData)} className="cursor-pointer">
-                {rowData.lessonNumber}
+      {/* Optimized Lesson Cards Grid */}
+      {filteredLessons.length > 0 && (
+        <div className="sw-grid sw-grid--auto-fit">
+          {filteredLessons.map((lesson) => (
+            <OptimizedLessonCard
+              key={lesson.id}
+              lesson={lesson}
+              onViewFullscreen={handleViewFullscreen}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Fullscreen Lesson Dialog */}
+      <Dialog
+        visible={showFullscreen}
+        onHide={() => setShowFullscreen(false)}
+        header={selectedLesson ? `Lesson ${selectedLesson.lessonNumber}: ${selectedLesson.technique}` : ''}
+        style={{ width: '90vw', maxWidth: '1200px' }}
+        maximizable
+        modal
+        className="lesson-detail-modal"
+      >
+        {selectedLesson && (
+          <div className="p-4">
+            {/* Lesson Header */}
+            <div className="mb-4">
+              <div className="flex align-items-center gap-2 mb-3">
+                <span className="sw-position-text">{selectedLesson.position}</span>
+                <span className="sw-slice-count">{selectedLesson.slices?.length || 0} slices</span>
               </div>
-            )}
-          />
-          <Column 
-            field="technique" 
-            header="Lesson Title" 
-            sortable
-            body={(rowData: Lesson) => (
-              <div onClick={() => handleRowClick(rowData)} className="cursor-pointer">
-                {rowData.technique}
-              </div>
-            )}
-          />
-          <Column 
-            field="position" 
-            header="Position" 
-            sortable
-            body={(rowData: Lesson) => (
-              <div onClick={() => handleRowClick(rowData)} className="cursor-pointer">
-                {rowData.position}
-              </div>
-            )}
-          />
-        </DataTable>
-      </div>
-      
-      {/* Lesson Detail Modal for Mobile */}
-      <LessonDetailModal
-        visible={showLessonModal}
-        onHide={() => setShowLessonModal(false)}
-        lesson={selectedLesson}
-      />
-      
+              
+              {selectedLesson.overview && (
+                <div className="mb-4">
+                  <h5 className="text-primary mb-2">Overview</h5>
+                  <p className="line-height-3 m-0">{selectedLesson.overview}</p>
+                </div>
+              )}
+              
+              {selectedLesson.mindsetMinute && (
+                <div className="mb-4">
+                  <div className="flex align-items-center gap-2 mb-2">
+                    <i className="pi pi-lightbulb text-orange-500"></i>
+                    <span className="font-semibold text-orange-500">Mindset Minute</span>
+                  </div>
+                  <p className="m-0 line-height-3 pl-6">{selectedLesson.mindsetMinute}</p>
+                </div>
+              )}
+              
+              {selectedLesson.streetTip && (
+                <div className="mb-4">
+                  <div className="flex align-items-center gap-2 mb-2">
+                    <i className="pi pi-shield text-cyan-500"></i>
+                    <span className="font-semibold text-cyan-500">Street Tip</span>
+                  </div>
+                  <p className="m-0 line-height-3 pl-6">{selectedLesson.streetTip}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Slices */}
+            <div className="grid">
+              {selectedLesson.slices?.map((slice, index) => (
+                <div key={slice.id || index} className="col-12 lg:col-6">
+                  <div className="sw-slice-content">
+                    <div className="flex justify-content-between align-items-start mb-3 pb-3 border-bottom-1 surface-border">
+                      <div className="flex-1">
+                        <div className="flex align-items-center gap-2 mb-2">
+                          <span className="sw-slice-number">Slice {slice.sliceNumber}</span>
+                          {slice.isBonusSlice && (
+                            <span className="sw-bonus-text">
+                              <i className="pi pi-star"></i> BONUS
+                            </span>
+                          )}
+                        </div>
+                        <h6 className="m-0 font-bold text-lg">{slice.title}</h6>
+                      </div>
+                    </div>
+
+                    {/* Essential Detail */}
+                    {slice.essentialDetail && (
+                      <div className="mb-3">
+                        <div className="flex align-items-center gap-2 mb-2">
+                          <i className="pi pi-check-circle text-green-500"></i>
+                          <span className="font-semibold text-green-600">Essential Detail</span>
+                        </div>
+                        <p className="m-0 text-sm pl-6 line-height-3">{slice.essentialDetail}</p>
+                      </div>
+                    )}
+
+                    {/* Most Common Mistake */}
+                    {slice.mostCommonMistake && (
+                      <div className="mb-3">
+                        <div className="flex align-items-center gap-2 mb-2">
+                          <i className="pi pi-exclamation-triangle text-red-500"></i>
+                          <span className="font-semibold text-red-600 text-sm">Most Common Mistake</span>
+                        </div>
+                        <p className="m-0 text-sm pl-6 line-height-3">{slice.mostCommonMistake}</p>
+                      </div>
+                    )}
+
+                    {/* Safety Tip */}
+                    {slice.safetyTip && (
+                      <div className="mb-3">
+                        <div className="flex align-items-center gap-2 mb-2">
+                          <i className="pi pi-shield text-orange-500"></i>
+                          <span className="font-semibold text-orange-600 text-sm">Safety Tip</span>
+                        </div>
+                        <p className="m-0 text-sm pl-6 line-height-3">{slice.safetyTip}</p>
+                      </div>
+                    )}
+
+                    {/* Principles */}
+                    {slice.corePrinciples && slice.corePrinciples.length > 0 && (
+                      <div className="mt-3 pt-3 border-top-1 surface-border">
+                        <div className="flex align-items-center gap-2 mb-2">
+                          <i className="pi pi-compass text-indigo-500"></i>
+                          <span className="font-semibold text-sm">Core Principles</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 pl-6">
+                          {slice.corePrinciples.map((p, i) => (
+                            <span 
+                              key={`${slice.id}-${i}`} 
+                              className="sw-principle-text"
+                            >
+                              {p.split(' (')[0]}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Dialog>
+
       <style jsx global>{`
-        .p-datatable .p-datatable-tbody > tr > td:first-child {
-          text-align: center;
+        .lesson-detail-modal .p-dialog-content {
+          padding: 0;
         }
         
-        .p-datatable .p-row-toggler {
-          color: var(--primary-color);
-          font-size: 1.2rem;
-          transition: transform 0.2s ease;
+        .lesson-detail-modal .p-dialog-header {
+          background: var(--surface-card);
+          border-bottom: 1px solid var(--surface-border);
         }
         
-        .p-datatable .p-row-toggler:hover {
-          color: var(--primary-600);
-          transform: scale(1.1);
-        }
-        
-        .p-datatable .p-row-toggler.p-row-toggler-icon {
-          transform: rotate(0deg);
-        }
-        
-        .p-datatable .p-row-toggler.p-row-toggler-icon.pi-chevron-right {
-          transform: rotate(0deg);
-        }
-        
-        .p-datatable .p-row-toggler.p-row-toggler-icon.pi-chevron-down {
-          transform: rotate(90deg);
-        }
-        
-        .p-datatable .p-datatable-tbody > tr.p-datatable-row-expansion {
-          background: var(--surface-100);
-        }
-        
-        .p-datatable .p-datatable-tbody > tr.p-datatable-row-expansion > td {
-          padding: 1rem;
-          border-top: 1px solid var(--surface-border);
-        }
-        
-        /* Mobile optimizations */
+        /* Mobile grid optimizations */
         @media (max-width: 768px) {
-          .p-datatable {
-            font-size: 0.875rem;
+          .sw-grid {
+            grid-template-columns: 1fr !important;
+            gap: var(--sw-space-sm) !important;
           }
           
-          .p-datatable .p-datatable-thead > tr > th,
-          .p-datatable .p-datatable-tbody > tr > td {
-            padding: 0.5rem;
+          .sw-grid--auto-fit {
+            grid-template-columns: 1fr !important;
           }
           
-          .lesson-detail-modal .p-dialog-content {
-            padding: 0.5rem;
+          .sw-grid--auto-fill {
+            grid-template-columns: 1fr !important;
+          }
+        }
+        
+        /* Mobile page header optimizations */
+        @media (max-width: 768px) {
+          .sw-page-header {
+            margin-bottom: var(--sw-space-md);
+            
+            h1 {
+              font-size: 1.75rem; /* Smaller than desktop */
+              margin-bottom: 0.5rem;
+            }
+            
+            .sw-page-subtitle {
+              font-size: 0.875rem;
+              margin-bottom: 1rem;
+            }
+          }
+        }
+        
+        /* Very small screens */
+        @media (max-width: 480px) {
+          .sw-page-header {
+            h1 {
+              font-size: 1.5rem;
+            }
+            
+            .sw-page-subtitle {
+              font-size: 0.8rem;
+            }
           }
         }
       `}</style>

@@ -268,46 +268,46 @@ const StudentProfilePage = () => {
   );
 
   // ---------- Load Student + Sessions + Plan ----------
-  useEffect(() => {
-    const loadData = async () => {
-      if (!id || typeof id !== 'string') return;
-      
-      // Load student
-      const studentData = await dataService.getStudent(id);
-      setStudent(studentData);
-      
-      // Load plan if exists
-      if (studentData?.planId) {
-        setPlanLoading(true);
-        try {
-          const plan = await dataService.getStudentPlan(id);
-          setStudentPlan(plan);
-          
-          const progress = await dataService.getStudentProgress(id);
-          setStudentProgress(progress);
-        } catch (error) {
-          console.error('Error loading plan:', error);
-        } finally {
-          setPlanLoading(false);
-        }
-      }
-      
-      // Load sessions
-      const sessionData = localStorage.getItem('coachSession_v2');
-      if (sessionData) {
-        const parsed = JSON.parse(sessionData);
-        const sessionEntries: CoachSession[] = Object.entries(parsed).map(([lessonId, steps]: any) => ({
-          timestamp: new Date().toLocaleString(),
-          lessonId,
-          completed: steps.filter((s: any) => s.completed).length / (steps.length || 1),
-          notes: steps.map((s: any) => s.notes).filter(Boolean).join('; '),
-        }));
-        setSessions(sessionEntries);
-      }
-    };
+  const loadData = useCallback(async () => {
+    if (!id || typeof id !== 'string') return;
     
-    loadData();
+    // Load student
+    const studentData = await dataService.getStudent(id);
+    setStudent(studentData);
+    
+    // Load plan if exists
+    if (studentData?.planId) {
+      setPlanLoading(true);
+      try {
+        const plan = await dataService.getStudentPlan(id);
+        setStudentPlan(plan);
+        
+        const progress = await dataService.getStudentProgress(id);
+        setStudentProgress(progress);
+      } catch (error) {
+        console.error('Error loading plan:', error);
+      } finally {
+        setPlanLoading(false);
+      }
+    }
+    
+    // Load sessions
+    const sessionData = localStorage.getItem('coachSession_v2');
+    if (sessionData) {
+      const parsed = JSON.parse(sessionData);
+      const sessionEntries: CoachSession[] = Object.entries(parsed).map(([lessonId, steps]: any) => ({
+        timestamp: new Date().toLocaleString(),
+        lessonId,
+        completed: steps.filter((s: any) => s.completed).length / (steps.length || 1),
+        notes: steps.map((s: any) => s.notes).filter(Boolean).join('; '),
+      }));
+      setSessions(sessionEntries);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // ---------- Save Student ----------
   const saveStudent = async (updates: Partial<Student>) => {

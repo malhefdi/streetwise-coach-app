@@ -45,7 +45,7 @@ const BatchActionDialog: React.FC<BatchActionDialogProps> = ({
   const getMessageSeverity = () => {
     switch (actionType) {
       case 'complete': return 'success';
-      case 'incomplete': return 'warning';
+      case 'incomplete': return 'warn';
       default: return 'info';
     }
   };

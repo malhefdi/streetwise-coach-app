@@ -108,12 +108,6 @@ const LessonDetailModal: React.FC<LessonDetailModalProps> = ({ visible, onHide, 
                   </div>
                 </div>
 
-                {slice.description && (
-                  <div className="mb-3">
-                    <p className="m-0 text-sm text-color-secondary">{slice.description}</p>
-                  </div>
-                )}
-
                 {slice.essentialDetail && (
                   <div className="mb-3">
                     <div className="flex align-items-center gap-2 mb-2">

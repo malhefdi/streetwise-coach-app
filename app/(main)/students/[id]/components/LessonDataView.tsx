@@ -307,8 +307,7 @@ const LessonDataView: React.FC<LessonDataViewProps> = ({
         emptyMessage="No lessons in plan"
         className="lesson-dataview"
         pt={{
-          grid: { className: 'grid' },
-          gridItem: { className: 'col-12 md:col-6 lg:col-4' }
+          grid: { className: 'grid' }
         }}
       />
     </div>

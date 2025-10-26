@@ -31,6 +31,8 @@ export interface IDataService {
   saveTestDrillProgress(studentId: string, progress: StudentTestDrillProgress): Promise<void>;
   recordTestDrillAttempt(studentId: string, attempt: TestDrillAttempt): Promise<void>;
   getTestDrillHistory(studentId: string): Promise<TestDrillAttempt[]>;
+  saveTestDrillOverride(studentId: string, drillNumber: number, reason: string): Promise<void>;
+  getTestDrillOverrides(studentId: string): Promise<Record<number, string>>;
   
   // Lesson Management
   updateStudentLesson(studentId: string, lessonId: string, updates: any): Promise<void>;
@@ -52,6 +54,7 @@ class LocalStorageDataService implements IDataService {
     ALL_SESSIONS: 'sw_all_sessions',
     TEST_DRILL_PROGRESS: (studentId: string) => `sw_test_drill_progress_${studentId}`,
     TEST_DRILL_ATTEMPTS: (studentId: string) => `sw_test_drill_attempts_${studentId}`,
+    TEST_DRILL_OVERRIDES: (studentId: string) => `sw_test_drill_overrides_${studentId}`,
     CUSTOM_LESSONS: (studentId: string) => `sw_custom_lessons_${studentId}`,
     PERSISTENT_STUDENTS: 'sw_persistent_students'
   };
@@ -255,6 +258,17 @@ class LocalStorageDataService implements IDataService {
     const customLessons = this.readJSON<Record<string, any>>(this.KEYS.CUSTOM_LESSONS(studentId), {});
     delete customLessons[lessonId];
     this.writeJSON(this.KEYS.CUSTOM_LESSONS(studentId), customLessons);
+  }
+
+  // Test Drill Overrides
+  async saveTestDrillOverride(studentId: string, drillNumber: number, reason: string): Promise<void> {
+    const overrides = this.readJSON<Record<number, string>>(this.KEYS.TEST_DRILL_OVERRIDES(studentId), {});
+    overrides[drillNumber] = reason;
+    this.writeJSON(this.KEYS.TEST_DRILL_OVERRIDES(studentId), overrides);
+  }
+
+  async getTestDrillOverrides(studentId: string): Promise<Record<number, string>> {
+    return this.readJSON<Record<number, string>>(this.KEYS.TEST_DRILL_OVERRIDES(studentId), {});
   }
 
   // Always-available students persistence

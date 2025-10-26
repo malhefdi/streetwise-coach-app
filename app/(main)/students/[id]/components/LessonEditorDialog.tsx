@@ -36,7 +36,13 @@ const LessonEditorDialog: React.FC<LessonEditorDialogProps> = ({
 
   useEffect(() => {
     if (lesson) {
-      setEditedLesson({ ...lesson });
+      // Use structuredClone for deep cloning if available, otherwise fallback to JSON method
+      try {
+        setEditedLesson(structuredClone(lesson));
+      } catch {
+        // Fallback for environments without structuredClone
+        setEditedLesson(JSON.parse(JSON.stringify(lesson)));
+      }
     }
   }, [lesson]);
 
@@ -68,7 +74,6 @@ const LessonEditorDialog: React.FC<LessonEditorDialogProps> = ({
       id: `slice-${Date.now()}`,
       sliceNumber: editedLesson.slices.length + 1,
       title: 'New Slice',
-      description: '',
       steps: [
         {
           id: `step-${Date.now()}`,
@@ -104,28 +109,36 @@ const LessonEditorDialog: React.FC<LessonEditorDialogProps> = ({
     const slice = editedLesson.slices[sliceIndex];
     const newStep: Step = {
       id: `step-${Date.now()}`,
-      stepNumber: slice.steps.length + 1,
+      stepNumber: (slice.steps?.length || 0) + 1,
       description: 'New Step'
     };
     
     const newSlices = [...editedLesson.slices];
-    newSlices[sliceIndex].steps = [...newSlices[sliceIndex].steps, newStep];
+    if (newSlices[sliceIndex].steps) {
+      newSlices[sliceIndex].steps = [...newSlices[sliceIndex].steps, newStep];
+    } else {
+      newSlices[sliceIndex].steps = [newStep];
+    }
     setEditedLesson({ ...editedLesson, slices: newSlices });
   };
 
   const updateStep = (sliceIndex: number, stepIndex: number, updatedStep: Step) => {
     const newSlices = [...editedLesson.slices];
-    newSlices[sliceIndex].steps[stepIndex] = updatedStep;
+    if (newSlices[sliceIndex].steps) {
+      newSlices[sliceIndex].steps[stepIndex] = updatedStep;
+    }
     setEditedLesson({ ...editedLesson, slices: newSlices });
   };
 
   const removeStep = (sliceIndex: number, stepIndex: number) => {
     const newSlices = [...editedLesson.slices];
-    newSlices[sliceIndex].steps.splice(stepIndex, 1);
-    // Renumber steps
-    newSlices[sliceIndex].steps.forEach((step, index) => {
-      step.stepNumber = index + 1;
-    });
+    if (newSlices[sliceIndex].steps) {
+      newSlices[sliceIndex].steps.splice(stepIndex, 1);
+      // Renumber steps
+      newSlices[sliceIndex].steps.forEach((step, index) => {
+        step.stepNumber = index + 1;
+      });
+    }
     setEditedLesson({ ...editedLesson, slices: newSlices });
   };
 
@@ -140,6 +153,25 @@ const LessonEditorDialog: React.FC<LessonEditorDialogProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  const validateLesson = (data: any): data is Lesson => {
+    return (
+      data &&
+      typeof data === 'object' &&
+      typeof data.id === 'string' &&
+      typeof data.lessonNumber === 'number' &&
+      typeof data.technique === 'string' &&
+      typeof data.position === 'string' &&
+      Array.isArray(data.slices) &&
+      data.slices.every((slice: any) => 
+        slice &&
+        typeof slice === 'object' &&
+        typeof slice.id === 'string' &&
+        typeof slice.title === 'string' &&
+        Array.isArray(slice.steps)
+      )
+    );
+  };
+
   const importLesson = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -147,7 +179,17 @@ const LessonEditorDialog: React.FC<LessonEditorDialogProps> = ({
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const importedLesson = JSON.parse(e.target?.result as string);
+        const result = e.target?.result;
+        if (typeof result !== 'string') {
+          throw new Error('Invalid file content');
+        }
+        
+        const importedLesson = JSON.parse(result);
+        
+        if (!validateLesson(importedLesson)) {
+          throw new Error('Invalid lesson structure');
+        }
+        
         setEditedLesson(importedLesson);
         toast.current?.show({
           severity: 'success',
@@ -185,7 +227,7 @@ const LessonEditorDialog: React.FC<LessonEditorDialogProps> = ({
                 <div>
                   <label className="block text-sm font-semibold mb-2">Lesson Number</label>
                   <InputText
-                    value={editedLesson.lessonNumber}
+                    value={editedLesson.lessonNumber.toString()}
                     onChange={(e) => setEditedLesson({
                       ...editedLesson,
                       lessonNumber: parseInt(e.target.value) || 0
@@ -316,7 +358,7 @@ const LessonEditorDialog: React.FC<LessonEditorDialogProps> = ({
                           Slice {slice.sliceNumber}: {slice.title}
                         </span>
                         <div className="flex align-items-center gap-2">
-                          <Tag value={`${slice.steps.length} steps`} severity="info" />
+                          <Tag value={`${slice.steps?.length || 0} steps`} severity="info" />
                           <Button
                             icon="pi pi-trash"
                             size="small"
@@ -351,13 +393,13 @@ const LessonEditorDialog: React.FC<LessonEditorDialogProps> = ({
                             <div>
                               <label className="block text-sm font-semibold mb-2">Description</label>
                               <InputTextarea
-                                value={slice.description || ''}
+                                value={''}
                                 onChange={(e) => updateSlice(sliceIndex, {
-                                  ...slice,
-                                  description: e.target.value
+                                  ...slice
                                 })}
                                 rows={3}
                                 className="w-full"
+                                placeholder="Slice description (not implemented in current type)"
                               />
                             </div>
 
@@ -407,7 +449,7 @@ const LessonEditorDialog: React.FC<LessonEditorDialogProps> = ({
                       <div className="col-12 md:col-6">
                         <Card title="Steps">
                           <div className="flex justify-content-between align-items-center mb-3">
-                            <span className="font-semibold">Steps ({slice.steps.length})</span>
+                            <span className="font-semibold">Steps ({slice.steps?.length || 0})</span>
                             <Button
                               icon="pi pi-plus"
                               label="Add Step"
@@ -417,7 +459,7 @@ const LessonEditorDialog: React.FC<LessonEditorDialogProps> = ({
                           </div>
                           
                           <div className="flex flex-column gap-2">
-                            {slice.steps.map((step, stepIndex) => (
+                            {(slice.steps || []).map((step, stepIndex) => (
                               <Card key={step.id} className="p-2 step-card">
                                 <div className="flex flex-column gap-2">
                                   <div className="flex justify-content-between align-items-center">

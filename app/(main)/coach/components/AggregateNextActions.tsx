@@ -58,7 +58,7 @@ const AggregateNextActions: React.FC<AggregateNextActionsProps> = ({
       case 'teach': return 'success';
       case 'review': return 'info';
       case 'reteach': return 'warning';
-      default: return 'secondary';
+      default: return 'info';
     }
   };
 

@@ -23,7 +23,7 @@ Context7 will automatically activate when working with:
 
 ### Manual Usage
 You can manually trigger Context7 by including `use context7` in your prompts:
-```
+```text
 Create a React component for user authentication. use context7
 ```
 

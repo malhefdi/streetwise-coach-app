@@ -15,7 +15,7 @@ export interface Principle {
    * This file acts as a canonical registry to ensure consistent tagging,
    * analytics, and AI reference across all datasets.
    */
-  export const PRINCIPLES: Principle[] = [
+  export const PRINCIPLES = [
     { id: 1, name: "Connection" },
     { id: 2, name: "Detachment" },
     { id: 3, name: "Distance" },
@@ -48,6 +48,6 @@ export interface Principle {
     { id: 30, name: "Mobility" },
     { id: 31, name: "Centerline" },
     { id: 32, name: "Grandmaster" },
-  ] as const;
+  ] as const satisfies readonly Principle[];
   
   export type PrincipleName = (typeof PRINCIPLES)[number]["name"];

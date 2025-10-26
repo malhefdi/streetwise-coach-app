@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 interface UseMobileOptimizationsOptions {
   autoHideDelay?: number;
@@ -30,21 +30,33 @@ export const useMobileOptimizations = (options: UseMobileOptimizationsOptions = 
   const [lastScrollY, setLastScrollY] = useState(0);
   const [scrollDirection, setScrollDirection] = useState<'up' | 'down'>('up');
   const [autoHideTimer, setAutoHideTimer] = useState<NodeJS.Timeout | null>(null);
+  const focusIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const toggleFocusTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load focus mode state from localStorage
   useEffect(() => {
-    const savedFocusMode = localStorage.getItem('focusMode');
-    if (savedFocusMode === 'true') {
-      setIsFocusMode(true);
-      setShowFocusIndicator(true);
-      // Hide indicator after 3 seconds
-      setTimeout(() => setShowFocusIndicator(false), 3000);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const savedFocusMode = localStorage.getItem('focusMode');
+      if (savedFocusMode === 'true') {
+        setIsFocusMode(true);
+        setShowFocusIndicator(true);
+        // Hide indicator after 3 seconds
+        focusIndicatorTimerRef.current = setTimeout(() => setShowFocusIndicator(false), 3000);
+      }
     }
+
+    return () => {
+      if (focusIndicatorTimerRef.current) {
+        clearTimeout(focusIndicatorTimerRef.current);
+      }
+    };
   }, []);
 
   // Save focus mode state to localStorage
   useEffect(() => {
-    localStorage.setItem('focusMode', isFocusMode.toString());
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('focusMode', isFocusMode.toString());
+    }
   }, [isFocusMode]);
 
   // Apply focus mode classes to body
@@ -142,8 +154,13 @@ export const useMobileOptimizations = (options: UseMobileOptimizationsOptions = 
       const newFocusMode = !prev;
       setShowFocusIndicator(true);
       
+      // Clear any existing timer
+      if (toggleFocusTimerRef.current) {
+        clearTimeout(toggleFocusTimerRef.current);
+      }
+      
       // Hide indicator after 3 seconds
-      setTimeout(() => setShowFocusIndicator(false), 3000);
+      toggleFocusTimerRef.current = setTimeout(() => setShowFocusIndicator(false), 3000);
       
       return newFocusMode;
     });
@@ -151,19 +168,32 @@ export const useMobileOptimizations = (options: UseMobileOptimizationsOptions = 
 
   // Show topbar on mouse move (desktop only)
   useEffect(() => {
-    if (window.innerWidth > 991) {
-      const handleMouseMove = () => {
-        if (isTopbarHidden) {
-          setIsTopbarHidden(false);
-        }
-      };
+    const mediaQuery = window.matchMedia('(min-width: 992px)');
+    
+    const handleMouseMove = () => {
+      if (isTopbarHidden) {
+        setIsTopbarHidden(false);
+      }
+    };
 
-      document.addEventListener('mousemove', handleMouseMove);
-      
-      return () => {
+    const handleMediaChange = () => {
+      if (mediaQuery.matches) {
+        document.addEventListener('mousemove', handleMouseMove);
+      } else {
         document.removeEventListener('mousemove', handleMouseMove);
-      };
-    }
+      }
+    };
+
+    // Initial setup
+    handleMediaChange();
+    
+    // Listen for media query changes
+    mediaQuery.addEventListener('change', handleMediaChange);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      mediaQuery.removeEventListener('change', handleMediaChange);
+    };
   }, [isTopbarHidden]);
 
   // Listen for custom focus mode toggle events
@@ -176,6 +206,9 @@ export const useMobileOptimizations = (options: UseMobileOptimizationsOptions = 
     
     return () => {
       window.removeEventListener('toggle-focus-mode', handleToggleFocusMode);
+      if (toggleFocusTimerRef.current) {
+        clearTimeout(toggleFocusTimerRef.current);
+      }
     };
   }, [toggleFocusMode]);
 

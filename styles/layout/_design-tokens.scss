@@ -1,0 +1,176 @@
+/* ============================================
+   StreetWise Coach - Design Tokens
+   ============================================ */
+
+/* Color Tokens - Semantic Names */
+:root {
+  /* Primary Colors */
+  --sw-primary: #22c55e;           /* Accent green */
+  --sw-primary-50: #f0fdf4;
+  --sw-primary-100: #dcfce7;
+  --sw-primary-200: #bbf7d0;
+  --sw-primary-300: #86efac;
+  --sw-primary-400: #4ade80;
+  --sw-primary-500: #22c55e;
+  --sw-primary-600: #16a34a;
+  --sw-primary-700: #15803d;
+  --sw-primary-800: #166534;
+  --sw-primary-900: #14532d;
+
+  /* Danger Colors */
+  --sw-danger: #ef4444;            /* Red */
+  --sw-danger-50: #fef2f2;
+  --sw-danger-100: #fee2e2;
+  --sw-danger-200: #fecaca;
+  --sw-danger-300: #fca5a5;
+  --sw-danger-400: #f87171;
+  --sw-danger-500: #ef4444;
+  --sw-danger-600: #dc2626;
+  --sw-danger-700: #b91c1c;
+  --sw-danger-800: #991b1b;
+  --sw-danger-900: #7f1d1d;
+
+  /* Info Colors */
+  --sw-info: #3b82f6;              /* Blue */
+  --sw-info-50: #eff6ff;
+  --sw-info-100: #dbeafe;
+  --sw-info-200: #bfdbfe;
+  --sw-info-300: #93c5fd;
+  --sw-info-400: #60a5fa;
+  --sw-info-500: #3b82f6;
+  --sw-info-600: #2563eb;
+  --sw-info-700: #1d4ed8;
+  --sw-info-800: #1e40af;
+  --sw-info-900: #1e3a8a;
+
+  /* Neutral Colors */
+  --sw-neutral: #64748b;           /* Slate */
+  --sw-neutral-50: #f8fafc;
+  --sw-neutral-100: #f1f5f9;
+  --sw-neutral-200: #e2e8f0;
+  --sw-neutral-300: #cbd5e1;
+  --sw-neutral-400: #94a3b8;
+  --sw-neutral-500: #64748b;
+  --sw-neutral-600: #475569;
+  --sw-neutral-700: #334155;
+  --sw-neutral-800: #1e293b;
+  --sw-neutral-900: #0f172a;
+
+  /* Text Emphasis Ramp */
+  --sw-text-high: var(--text-color);           /* Titles, headings */
+  --sw-text-med: var(--text-color-secondary);  /* Body text */
+  --sw-text-low: var(--text-color-secondary);  /* Meta text, hints */
+  --sw-text-muted: rgba(var(--text-color-rgb), 0.6);
+
+  /* Spacing Scale - 8px Grid */
+  --sw-space-xs: 0.25rem;    /* 4px */
+  --sw-space-sm: 0.5rem;     /* 8px */
+  --sw-space-md: 1rem;       /* 16px */
+  --sw-space-lg: 1.5rem;     /* 24px */
+  --sw-space-xl: 2rem;       /* 32px */
+  --sw-space-2xl: 2.5rem;    /* 40px */
+  --sw-space-3xl: 3rem;      /* 48px */
+
+  /* Typography Scale */
+  --sw-text-xs: 0.75rem;     /* 12px */
+  --sw-text-sm: 0.875rem;    /* 14px - Body */
+  --sw-text-base: 1rem;      /* 16px - Section */
+  --sw-text-lg: 1.125rem;    /* 18px */
+  --sw-text-xl: 1.25rem;     /* 20px */
+  --sw-text-2xl: 1.5rem;     /* 24px - Title */
+  --sw-text-3xl: 1.875rem;   /* 30px */
+  --sw-text-4xl: 2.25rem;    /* 36px */
+
+  /* Font Weights */
+  --sw-font-normal: 400;
+  --sw-font-medium: 500;
+  --sw-font-semibold: 600;
+  --sw-font-bold: 700;
+
+  /* Line Heights */
+  --sw-leading-tight: 1.25;
+  --sw-leading-normal: 1.5;
+  --sw-leading-relaxed: 1.6;
+
+  /* Border Radius */
+  --sw-radius-sm: 0.375rem;   /* 6px */
+  --sw-radius-md: 0.5rem;     /* 8px */
+  --sw-radius-lg: 0.75rem;    /* 12px */
+  --sw-radius-xl: 1rem;       /* 16px */
+  --sw-radius-2xl: 1.5rem;    /* 24px */
+  --sw-radius-full: 9999px;
+
+  /* Shadows */
+  --sw-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --sw-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --sw-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --sw-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Transitions */
+  --sw-transition-fast: 150ms ease;
+  --sw-transition-normal: 200ms ease;
+  --sw-transition-slow: 300ms ease;
+
+  /* Focus Ring */
+  --sw-focus-ring: 0 0 0 2px var(--sw-primary-500);
+  --sw-focus-ring-offset: 0 0 0 2px var(--surface-ground), 0 0 0 4px var(--sw-primary-500);
+}
+
+/* Dark Theme Adjustments */
+[data-theme="dark"] {
+  --sw-text-high: var(--text-color);
+  --sw-text-med: var(--text-color-secondary);
+  --sw-text-low: rgba(var(--text-color-rgb), 0.7);
+  --sw-text-muted: rgba(var(--text-color-rgb), 0.5);
+
+  /* Adjust shadows for dark mode */
+  --sw-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --sw-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --sw-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  --sw-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Utility Classes */
+.sw-text-high { color: var(--sw-text-high); }
+.sw-text-med { color: var(--sw-text-med); }
+.sw-text-low { color: var(--sw-text-low); }
+.sw-text-muted { color: var(--sw-text-muted); }
+
+.sw-text-xs { font-size: var(--sw-text-xs); }
+.sw-text-sm { font-size: var(--sw-text-sm); }
+.sw-text-base { font-size: var(--sw-text-base); }
+.sw-text-lg { font-size: var(--sw-text-lg); }
+.sw-text-xl { font-size: var(--sw-text-xl); }
+.sw-text-2xl { font-size: var(--sw-text-2xl); }
+.sw-text-3xl { font-size: var(--sw-text-3xl); }
+.sw-text-4xl { font-size: var(--sw-text-4xl); }
+
+.sw-font-normal { font-weight: var(--sw-font-normal); }
+.sw-font-medium { font-weight: var(--sw-font-medium); }
+.sw-font-semibold { font-weight: var(--sw-font-semibold); }
+.sw-font-bold { font-weight: var(--sw-font-bold); }
+
+.sw-leading-tight { line-height: var(--sw-leading-tight); }
+.sw-leading-normal { line-height: var(--sw-leading-normal); }
+.sw-leading-relaxed { line-height: var(--sw-leading-relaxed); }
+
+/* Spacing Utilities */
+.sw-space-xs { margin: var(--sw-space-xs); }
+.sw-space-sm { margin: var(--sw-space-sm); }
+.sw-space-md { margin: var(--sw-space-md); }
+.sw-space-lg { margin: var(--sw-space-lg); }
+.sw-space-xl { margin: var(--sw-space-xl); }
+
+.sw-p-xs { padding: var(--sw-space-xs); }
+.sw-p-sm { padding: var(--sw-space-sm); }
+.sw-p-md { padding: var(--sw-space-md); }
+.sw-p-lg { padding: var(--sw-space-lg); }
+.sw-p-xl { padding: var(--sw-space-xl); }
+
+/* Border Radius Utilities */
+.sw-rounded-sm { border-radius: var(--sw-radius-sm); }
+.sw-rounded-md { border-radius: var(--sw-radius-md); }
+.sw-rounded-lg { border-radius: var(--sw-radius-lg); }
+.sw-rounded-xl { border-radius: var(--sw-radius-xl); }
+.sw-rounded-2xl { border-radius: var(--sw-radius-2xl); }
+.sw-rounded-full { border-radius: var(--sw-radius-full); }

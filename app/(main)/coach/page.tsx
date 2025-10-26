@@ -32,6 +32,7 @@ import BatchActionDialog from './components/BatchActionDialog';
 import DashboardOverview from './components/DashboardOverview';
 import AggregateSessionSummary from './components/AggregateSessionSummary';
 import AggregateNextActions from './components/AggregateNextActions';
+import SessionNextActions from './components/SessionNextActions';
 import TestDrillsUtilities from './components/TestDrillsUtilities';
 import LessonEditorDialog from '../students/[id]/components/LessonEditorDialog';
 
@@ -61,8 +62,13 @@ interface LegacyLessonProgress {
   [sliceKey: string]: StepState[]; // e.g., "gc2-l1-s2" -> steps[]
 }
 
+interface SliceState {
+  steps: StepState[];
+  nextAction?: NextAction;
+}
+
 interface SessionData {
-  [sliceKey: string]: StepState[] | SparringState; // e.g., "gc2-l1-s2" -> steps[] or sparring state
+  [sliceKey: string]: StepState[] | SparringState | SliceState; // e.g., "gc2-l1-s2" -> steps[] or sparring state or slice state
 }
 
 // ---------- Helpers ----------
@@ -106,7 +112,7 @@ const CoachPage = () => {
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   
   // Session state
-  const [session, setSession] = useState<LegacyLessonProgress>({});
+  const [session, setSession] = useState<SessionData>({});
   const [elapsed, setElapsed] = useState(0);
   const [sparringState, setSparringState] = useState<SparringState>({
     rapidMasteryCompleted: false,
@@ -120,12 +126,22 @@ const CoachPage = () => {
   const [activeSlices, setActiveSlices] = useState<Record<string, number[]>>({});
   const [summaryVisible, setSummaryVisible] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
+  const [editingStep, setEditingStep] = useState<{lessonId: string, sliceIndex: number, stepIndex: number} | null>(null);
   
   // Dashboard state
   const [sidebarTab, setSidebarTab] = useState<'summary' | 'actions' | 'testdrills'>('summary');
   const [expandedLessons, setExpandedLessons] = useState<string[]>([]);
   const [testDrillsData, setTestDrillsData] = useState<Map<string, TestDrillReadiness[]>>(new Map());
-  const [allStudentsWithStats, setAllStudentsWithStats] = useState<any[]>([]);
+  const [allStudentsWithStats, setAllStudentsWithStats] = useState<Array<Student & {
+    overallProgress: number;
+    lessonsCompleted: number;
+    avgConfidence: number;
+    testReadiness: TestDrillReadiness[];
+    curriculumId: string;
+    status: 'active' | 'needs-attention' | 'ready-to-test';
+    recentActivity: string;
+    nextActions: any[];
+  }>>([]);
   const [testDrills, setTestDrills] = useState<TestDrill[]>([]);
   
   // Lesson editing state
@@ -179,113 +195,223 @@ const CoachPage = () => {
     return () => clearInterval(t);
   }, []);
 
-  // Load student data and plan
-  useEffect(() => {
-    const loadStudentData = async () => {
-      if (studentId) {
-        setLoading(true);
-        try {
-          const s = await dataService.getStudent(studentId);
-          setStudent(s);
+  // Helper function to load student and plan data
+  const loadStudentAndPlan = async (studentId: string): Promise<void> => {
+    const s = await dataService.getStudent(studentId);
+    setStudent(s);
 
-          if (s?.planId) {
-            const p = await dataService.getStudentPlan(studentId);
-            setPlan(p);
+    if (s?.planId) {
+      const p = await dataService.getStudentPlan(studentId);
+      setPlan(p);
 
-            if (p) {
-              // Collect lessons from all curricula based on plan
-              const ordered: Lesson[] = [];
-              
-              p.lessonIds.forEach(id => {
-                for (const curriculum of allCurricula) {
-                  const lesson = curriculum.lessons.find(l => l.id === id);
-                  if (lesson) {
-                    ordered.push(lesson);
-                    break;
-                  }
-                }
-              });
-              
-              setPlanLessons(ordered);
+      if (p) {
+        // Collect lessons from all curricula based on plan
+        const ordered: Lesson[] = [];
+        
+        p.lessonIds.forEach(id => {
+          for (const curriculum of allCurricula) {
+            const lesson = curriculum.lessons.find(l => l.id === id);
+            if (lesson) {
+              ordered.push(lesson);
+              break;
             }
-          } else {
-            // Student has no plan - show warning
-            setPlanLessons([]);
           }
-        } catch (error) {
-          console.error('Error loading student data:', error);
-        } finally {
-          setLoading(false);
+        });
+        
+        setPlanLessons(ordered);
+      }
+    } else {
+      // Student has no plan - show warning
+      setPlanLessons([]);
+    }
+  };
+
+  // Helper function to load dashboard data
+  const loadDashboardData = async (): Promise<void> => {
+    try {
+      console.log('Loading dashboard data...');
+      const students = await dataService.getStudents();
+      console.log('Students loaded:', students.length);
+      const studentsWithPlans = students.filter(s => s.planId);
+      console.log('Students with plans:', studentsWithPlans.length);
+      
+      // If no students, create some mock data for demo purposes
+      if (studentsWithPlans.length === 0) {
+        console.log('No students found, creating mock data...');
+        const mockStudents = [
+          {
+            id: 'mock-1',
+            name: 'Demo Student 1',
+            rank: 'White Belt',
+            planId: 'mock-plan-1',
+            sessions: 5,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'mock-2', 
+            name: 'Demo Student 2',
+            rank: 'Blue Belt',
+            planId: 'mock-plan-2',
+            sessions: 12,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ];
+        setAllStudents(mockStudents);
+        studentsWithPlans.push(...mockStudents);
+      } else {
+        setAllStudents(studentsWithPlans);
+      }
+
+    // Load test drill data for all students
+    const drillsMap = new Map<string, TestDrillReadiness[]>();
+    const studentsWithStats = [];
+
+    for (const student of studentsWithPlans) {
+      try {
+        const plan = await dataService.getStudentPlan(student.id);
+        const progress = await dataService.getStudentProgress(student.id);
+        const curriculum = plan ? getCurriculum('gc2') : null;
+        
+        if (curriculum) {
+          // Calculate test drill readiness
+          const testDrills = getTestDrillsForCurriculum(curriculum.id);
+          const readiness = testDrills.map(drill => {
+            // Mock readiness calculation - in real app this would use the service
+            const mockReadiness: TestDrillReadiness = {
+              drillNumber: drill.drillNumber,
+              isReady: Math.random() > 0.5,
+              missingLessons: [],
+              completionPercentage: Math.floor(Math.random() * 100)
+            };
+            return mockReadiness;
+          });
+          
+          drillsMap.set(student.id, readiness);
+
+          // Calculate student stats
+          const studentStats = {
+            ...student,
+            overallProgress: Math.floor(Math.random() * 100),
+            lessonsCompleted: Math.floor(Math.random() * 20),
+            avgConfidence: Math.floor(Math.random() * 100),
+            testReadiness: readiness,
+            curriculumId: curriculum.id,
+            status: (readiness.some(r => r.isReady) ? 'ready-to-test' : 
+                   readiness.some(r => r.completionPercentage > 50) ? 'needs-attention' : 'active') as 'active' | 'needs-attention' | 'ready-to-test',
+            recentActivity: 'Last session 2 days ago',
+            nextActions: [] // Mock empty actions array
+          };
+          studentsWithStats.push(studentStats);
+        }
+      } catch (error) {
+        console.error(`Error loading data for student ${student.id}:`, error);
+      }
+    }
+
+      setTestDrillsData(drillsMap);
+      setAllStudentsWithStats(studentsWithStats);
+      
+      // Load test drills for the first curriculum (GC2)
+      const gc2Curriculum = getCurriculum('gc2');
+      if (gc2Curriculum) {
+        setTestDrills(getTestDrillsForCurriculum('gc2'));
+      }
+      
+      console.log('Dashboard data loaded successfully');
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to calculate test drills
+  const calculateTestDrills = (curriculumId: string): TestDrillReadiness[] => {
+    const testDrills = getTestDrillsForCurriculum(curriculumId);
+    return testDrills.map(drill => {
+      // Mock readiness calculation - in real app this would use the service
+      const mockReadiness: TestDrillReadiness = {
+        drillNumber: drill.drillNumber,
+        isReady: Math.random() > 0.5,
+        missingLessons: [],
+        completionPercentage: Math.floor(Math.random() * 100)
+      };
+      return mockReadiness;
+    });
+  };
+
+  // Shared function to load student data (used by both useEffect and handleSaveLesson)
+  const loadStudentData = async (studentId: string): Promise<void> => {
+    setLoading(true);
+    try {
+      const s = await dataService.getStudent(studentId);
+      setStudent(s);
+
+      if (s?.planId) {
+        const p = await dataService.getStudentPlan(studentId);
+        setPlan(p);
+
+        if (p) {
+          // Collect lessons from all curricula based on plan
+          const ordered: Lesson[] = [];
+          
+          p.lessonIds.forEach(id => {
+            for (const curriculum of allCurricula) {
+              const lesson = curriculum.lessons.find(l => l.id === id);
+              if (lesson) {
+                ordered.push(lesson);
+                break;
+              }
+            }
+          });
+          
+          setPlanLessons(ordered);
         }
       } else {
-        // No student selected - load dashboard data
-        setLoading(true);
-        try {
-          const students = await dataService.getStudents();
-          const studentsWithPlans = students.filter(s => s.planId);
-          setAllStudents(studentsWithPlans);
+        // Student has no plan - show warning
+        setPlanLessons([]);
+      }
+    } catch (error) {
+      console.error('Error loading student data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-          // Load test drill data for all students
-          const drillsMap = new Map<string, TestDrillReadiness[]>();
-          const studentsWithStats = [];
+  // Load student data and plan
+  useEffect(() => {
+    let mounted = true;
 
-          for (const student of studentsWithPlans) {
-            try {
-              const plan = await dataService.getStudentPlan(student.id);
-              const progress = await dataService.getStudentProgress(student.id);
-              const curriculum = plan ? getCurriculum('gc2') : null;
-              
-              if (curriculum) {
-                // Calculate test drill readiness
-                const testDrills = getTestDrillsForCurriculum(curriculum.id);
-                const readiness = testDrills.map(drill => {
-                  // Mock readiness calculation - in real app this would use the service
-                  const mockReadiness: TestDrillReadiness = {
-                    drillNumber: drill.drillNumber,
-                    isReady: Math.random() > 0.5,
-                    missingLessons: [],
-                    completionPercentage: Math.floor(Math.random() * 100)
-                  };
-                  return mockReadiness;
-                });
-                
-                drillsMap.set(student.id, readiness);
-
-                // Calculate student stats
-                const studentStats = {
-                  ...student,
-                  overallProgress: Math.floor(Math.random() * 100),
-                  lessonsCompleted: Math.floor(Math.random() * 20),
-                  avgConfidence: Math.floor(Math.random() * 100),
-                  testReadiness: readiness,
-                  status: readiness.some(r => r.isReady) ? 'ready-to-test' : 
-                         readiness.some(r => r.completionPercentage > 50) ? 'needs-attention' : 'active',
-                  recentActivity: 'Last session 2 days ago'
-                };
-                studentsWithStats.push(studentStats);
-              }
-            } catch (error) {
-              console.error(`Error loading data for student ${student.id}:`, error);
-            }
-          }
-
-          setTestDrillsData(drillsMap);
-          setAllStudentsWithStats(studentsWithStats);
-          
-          // Load test drills for the first curriculum (GC2)
-          const gc2Curriculum = getCurriculum('gc2');
-          if (gc2Curriculum) {
-            setTestDrills(getTestDrillsForCurriculum('gc2'));
-          }
-        } catch (error) {
-          console.error('Error loading dashboard data:', error);
-        } finally {
-          setLoading(false);
+    const loadData = async () => {
+      try {
+        if (studentId) {
+          await loadStudentData(studentId);
+        } else {
+          await loadDashboardData();
         }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    loadStudentData();
+    // Add a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('Loading timeout reached, setting loading to false');
+      setLoading(false);
+    }, 10000); // 10 second timeout
+
+    loadData().finally(() => {
+      clearTimeout(timeoutId);
+    });
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [studentId]);
 
   // Load / Save session
@@ -351,30 +477,78 @@ const CoachPage = () => {
 
   const computeLessonCompletion = (lessonId: string) => {
     const keys = Object.keys(session).filter((k) => k.startsWith(`${lessonId}-`));
-    const all = keys.flatMap((k) => session[k] || []);
+    const all = keys.flatMap((k) => getStepsFromSession(session[k] || []));
     if (!all.length) return 0;
     const done = all.filter((s) => s.completed).length;
     return Math.round((done / all.length) * 100);
   };
 
+  // Helper function to safely get steps from session data
+  const getStepsFromSession = (sessionData: StepState[] | SparringState | SliceState): StepState[] => {
+    if (Array.isArray(sessionData)) {
+      return sessionData;
+    } else if (sessionData && typeof sessionData === 'object' && 'steps' in sessionData) {
+      return (sessionData as SliceState).steps;
+    }
+    return [];
+  };
+
   // Build "next session" report items
   const nextSessionItems = useMemo(() => {
-    return Object.entries(session).flatMap(([key, steps]) =>
+    return Object.entries(session).flatMap(([key, sessionData]) => {
+      const steps = getStepsFromSession(sessionData);
+      const items = [];
+      
+      // Parse lesson and slice info from key (format: "gc2-l1-s2")
+      const parts = key.split('-');
+      const lessonId = parts.slice(0, 2).join('-'); // "gc2-l1"
+      const sliceIndex = parts.length >= 3 ? parseInt(parts[2].substring(1)) - 1 : 0; // "s2" -> 1
+      
+      // Find lesson and slice info
+      const lesson = planLessons.find(l => l.id === lessonId);
+      const slice = lesson?.slices?.[sliceIndex];
+      const lessonName = lesson?.technique || lessonId;
+      const sliceName = slice?.title || `Slice ${sliceIndex + 1}`;
+      
+      // Add step-level next actions
       steps
         .map((s, i) => ({ key, i, s }))
         .filter(({ s }) => !!s.nextAction)
-        .map(({ key, i, s }) => ({
-          key,
-          stepNumber: i + 1,
-          nextAction: s.nextAction as NextAction,
-          notes: s.notes
-        }))
-    );
-  }, [session]);
+        .forEach(({ key, i, s }) => {
+          items.push({
+            key: `${key}-step-${i}`,
+            stepNumber: i + 1,
+            nextAction: s.nextAction as NextAction,
+            notes: s.notes,
+            type: 'step' as const,
+            lessonName,
+            sliceName
+          });
+        });
+      
+      // Add slice-level next actions
+      if (sessionData && typeof sessionData === 'object' && 'nextAction' in sessionData) {
+        const sliceState = sessionData as SliceState;
+        if (sliceState.nextAction) {
+          items.push({
+            key: `${key}-slice`,
+            stepNumber: 0, // 0 indicates slice-level
+            nextAction: sliceState.nextAction,
+            notes: `Slice-level action`,
+            type: 'slice' as const,
+            lessonName,
+            sliceName
+          });
+        }
+      }
+      
+      return items;
+    });
+  }, [session, planLessons]);
 
   // Compute overall progress
   const overallProgress = useMemo(() => {
-    const allSteps = Object.values(session).flat();
+    const allSteps = Object.values(session).flatMap(sessionData => getStepsFromSession(sessionData));
     if (allSteps.length === 0) return 0;
     const completedSteps = allSteps.filter(s => s.completed).length;
     return Math.round((completedSteps / allSteps.length) * 100);
@@ -382,14 +556,15 @@ const CoachPage = () => {
 
   // Compute completed and total steps
   const { completedSteps, totalSteps } = useMemo(() => {
-    const allSteps = Object.values(session).flat();
+    const allSteps = Object.values(session).flatMap(sessionData => getStepsFromSession(sessionData));
     const completed = allSteps.filter(s => s.completed).length;
     return { completedSteps: completed, totalSteps: allSteps.length };
   }, [session]);
 
   // Build summary data for grid
   const summaryData = useMemo(() => {
-    return Object.entries(session).map(([key, steps]) => {
+    return Object.entries(session).map(([key, sessionData]) => {
+      const steps = getStepsFromSession(sessionData);
       const completed = steps.filter(s => s.completed).length;
       const avgConfidence = steps.length > 0 
         ? Math.round(steps.reduce((sum, s) => sum + s.confidence, 0) / steps.length)
@@ -421,7 +596,9 @@ const CoachPage = () => {
         // Lesson-level batch action
         const keys = Object.keys(newSession).filter(k => k.startsWith(`${target.lessonId}-`));
         keys.forEach(key => {
-          newSession[key] = newSession[key].map(step => {
+          const sessionData = newSession[key];
+          const steps = getStepsFromSession(sessionData);
+          const updatedSteps = steps.map(step => {
             if (actionType === 'confidence' && value !== undefined) {
               return { ...step, confidence: value };
             } else if (actionType === 'complete') {
@@ -431,11 +608,20 @@ const CoachPage = () => {
             }
             return step;
           });
+          
+          // Preserve the original structure (array or SliceState)
+          if (Array.isArray(sessionData)) {
+            newSession[key] = updatedSteps;
+          } else if (sessionData && typeof sessionData === 'object' && 'steps' in sessionData) {
+            newSession[key] = { ...sessionData, steps: updatedSteps };
+          }
         });
       } else if (target.sliceKey) {
         // Slice-level batch action
-        if (newSession[target.sliceKey]) {
-          newSession[target.sliceKey] = newSession[target.sliceKey].map(step => {
+        const sessionData = newSession[target.sliceKey];
+        if (sessionData) {
+          const steps = getStepsFromSession(sessionData);
+          const updatedSteps = steps.map(step => {
             if (actionType === 'confidence' && value !== undefined) {
               return { ...step, confidence: value };
             } else if (actionType === 'complete') {
@@ -445,6 +631,13 @@ const CoachPage = () => {
             }
             return step;
           });
+          
+          // Preserve the original structure (array or SliceState)
+          if (Array.isArray(sessionData)) {
+            newSession[target.sliceKey] = updatedSteps;
+          } else if (sessionData && typeof sessionData === 'object' && 'steps' in sessionData) {
+            newSession[target.sliceKey] = { ...sessionData, steps: updatedSteps };
+          }
         }
       }
       
@@ -501,42 +694,7 @@ const CoachPage = () => {
     try {
       await dataService.updateStudentLesson(studentId, updatedLesson.id, updatedLesson);
       // Reload data to reflect changes
-      const loadStudentData = async () => {
-        if (studentId) {
-          setLoading(true);
-          try {
-            const s = await dataService.getStudent(studentId);
-            setStudent(s);
-
-            if (s?.planId) {
-              const p = await dataService.getStudentPlan(studentId);
-              setPlan(p);
-
-              if (p) {
-                // Collect lessons from all curricula based on plan
-                const ordered: Lesson[] = [];
-                
-                p.lessonIds.forEach(id => {
-                  for (const curriculum of allCurricula) {
-                    const lesson = curriculum.lessons.find(l => l.id === id);
-                    if (lesson) {
-                      ordered.push(lesson);
-                      break;
-                    }
-                  }
-                });
-                
-                setPlanLessons(ordered);
-              }
-            }
-          } catch (error) {
-            console.error('Error loading student data:', error);
-          } finally {
-            setLoading(false);
-          }
-        }
-      };
-      await loadStudentData();
+      await loadStudentData(studentId);
     } catch (error) {
       console.error('Error saving lesson:', error);
       throw error;
@@ -547,13 +705,29 @@ const CoachPage = () => {
     setBatchActionType(actionType);
     setBatchTarget(target);
     
-    // Count items
+    // Count items - use curriculum step count, not just session data
     let count = 0;
     if (target.lessonId) {
-      const keys = Object.keys(session).filter(k => k.startsWith(`${target.lessonId}-`));
-      count = keys.reduce((sum, key) => sum + session[key].length, 0);
+      const lesson = planLessons.find(l => l.id === target.lessonId);
+      if (lesson) {
+        count = lesson.slices.reduce((sum, slice) => sum + (slice.steps?.length || 1), 0);
+      }
     } else if (target.sliceKey) {
-      count = session[target.sliceKey]?.length || 0;
+      // Extract lesson and slice info from sliceKey (format: "gc2-l1-s2")
+      const parts = target.sliceKey.split('-');
+      if (parts.length >= 3) {
+        const lessonId = parts.slice(0, 2).join('-'); // "gc2-l1"
+        const sliceIndex = parseInt(parts[2].substring(1)) - 1; // "s2" -> 1
+        const lesson = planLessons.find(l => l.id === lessonId);
+        if (lesson && lesson.slices[sliceIndex]) {
+          count = lesson.slices[sliceIndex].steps?.length || 1;
+        }
+      }
+    }
+    
+    // Don't show dialog if there are truly 0 steps
+    if (count === 0) {
+      return;
     }
     
     setBatchItemCount(count);
@@ -561,48 +735,78 @@ const CoachPage = () => {
   };
 
   // ---------- Mutations ----------
-  const ensureSlicePersisted = (lessonId: string, sIdx: number, slice: Slice): StepState[] => {
+  const getSliceState = (lessonId: string, sIdx: number, slice: Slice): SliceState => {
     const key = sliceKeyOf(lessonId, sIdx);
     const current = session[key];
-    if (current && current.length) {
-      // Ensure existing steps have descriptions (for backward compatibility)
-      return current.map((state, idx) => ({
-        ...state,
-        description: state.description || slice.steps?.[idx]?.description || `Step ${idx + 1}`
-      }));
+    
+    if (current && Array.isArray(current)) {
+      // Legacy format: just an array of steps
+      return {
+        steps: current.map((state, idx) => ({
+          ...state,
+          description: state.description || slice.steps?.[idx]?.description || `Step ${idx + 1}`
+        })),
+        nextAction: undefined
+      };
+    } else if (current && typeof current === 'object' && 'steps' in current) {
+      // New format: SliceState object
+      const sliceState = current as SliceState;
+      return {
+        steps: sliceState.steps.map((state, idx) => ({
+          ...state,
+          description: state.description || slice.steps?.[idx]?.description || `Step ${idx + 1}`
+        })),
+        nextAction: sliceState.nextAction
+      };
     }
 
     // Seed with defaults matching the curriculum step count
     const baseSteps = slice.steps || [];
-    return Array.from({ length: baseSteps.length || 1 }, (_, idx) => 
-      DEFAULT_STEP_STATE(baseSteps[idx]?.description || `Step ${idx + 1}`)
-    );
+    return {
+      steps: Array.from({ length: baseSteps.length || 1 }, (_, idx) => 
+        DEFAULT_STEP_STATE(baseSteps[idx]?.description || `Step ${idx + 1}`)
+      ),
+      nextAction: undefined
+    };
+  };
+
+  const ensureSlicePersisted = (lessonId: string, sIdx: number, slice: Slice): StepState[] => {
+    return getSliceState(lessonId, sIdx, slice).steps;
   };
 
   const updateStep = (lessonId: string, sIdx: number, stIdx: number, updates: Partial<StepState>, slice: Slice) => {
     setSession((prev) => {
       const key = sliceKeyOf(lessonId, sIdx);
-      const steps = ensureSlicePersisted(lessonId, sIdx, slice);
-      steps[stIdx] = { ...steps[stIdx], ...updates };
-      return { ...prev, [key]: steps };
+      const sliceState = getSliceState(lessonId, sIdx, slice);
+      sliceState.steps[stIdx] = { ...sliceState.steps[stIdx], ...updates };
+      return { ...prev, [key]: sliceState };
+    });
+  };
+
+  const updateSliceNextAction = (lessonId: string, sIdx: number, nextAction: NextAction | undefined, slice: Slice) => {
+    setSession((prev) => {
+      const key = sliceKeyOf(lessonId, sIdx);
+      const sliceState = getSliceState(lessonId, sIdx, slice);
+      sliceState.nextAction = nextAction;
+      return { ...prev, [key]: sliceState };
     });
   };
 
   const addStep = (lessonId: string, sIdx: number, slice: Slice) => {
     setSession((prev) => {
       const key = sliceKeyOf(lessonId, sIdx);
-      const steps = ensureSlicePersisted(lessonId, sIdx, slice);
-      steps.push(DEFAULT_STEP_STATE('New step - edit to add instructions'));
-      return { ...prev, [key]: steps };
+      const sliceState = getSliceState(lessonId, sIdx, slice);
+      sliceState.steps.push(DEFAULT_STEP_STATE('New step - edit to add instructions'));
+      return { ...prev, [key]: sliceState };
     });
   };
 
   const removeStep = (lessonId: string, sIdx: number, slice: Slice) => {
     setSession((prev) => {
       const key = sliceKeyOf(lessonId, sIdx);
-      const steps = ensureSlicePersisted(lessonId, sIdx, slice);
-      if (steps.length > 1) steps.pop(); // keep at least 1 step
-      return { ...prev, [key]: steps };
+      const sliceState = getSliceState(lessonId, sIdx, slice);
+      if (sliceState.steps.length > 1) sliceState.steps.pop(); // keep at least 1 step
+      return { ...prev, [key]: sliceState };
     });
   };
 
@@ -621,7 +825,7 @@ const CoachPage = () => {
 
         const sliceProgresses: SliceProgress[] = lesson.slices.map((slice, sIdx) => {
           const key = sliceKeyOf(lessonId, sIdx);
-          const stepStates = session[key] || [];
+          const stepStates = getStepsFromSession(session[key] || []);
           
           const steps: StepProgressType[] = stepStates.map((state, stepIdx) => ({
             stepNumber: stepIdx + 1,
@@ -739,15 +943,20 @@ const CoachPage = () => {
                 />
               )}
               {sidebarTab === 'actions' && (
-                <AggregateNextActions
-                  students={allStudentsWithStats}
-                  onItemCheck={handleItemCheck}
-                  onStartTest={handleStartTest}
-                />
+                <div className="space-y-4">
+                  <SessionNextActions
+                    nextActions={nextSessionItems}
+                  />
+                  <AggregateNextActions
+                    students={allStudentsWithStats}
+                    onItemCheck={handleItemCheck}
+                    onStartTest={handleStartTest}
+                  />
+                </div>
               )}
               {sidebarTab === 'testdrills' && (
                 <TestDrillsUtilities
-                  student={student}
+                  student={null}
                   allStudents={allStudentsWithStats}
                   testDrills={testDrills}
                   onStartTest={handleStartTest}
@@ -872,7 +1081,7 @@ const CoachPage = () => {
             const lessonId = lessonIdOf(lesson);
             const progress = computeLessonCompletion(lessonId);
             const lessonSteps = Object.keys(session).filter(k => k.startsWith(`${lessonId}-`));
-            const allSteps = lessonSteps.flatMap(key => session[key] || []);
+            const allSteps = lessonSteps.flatMap(key => getStepsFromSession(session[key] || []));
             const avgConfidence = allSteps.length > 0 
               ? Math.round(allSteps.reduce((sum, s) => sum + s.confidence, 0) / allSteps.length)
               : 0;
@@ -1025,7 +1234,7 @@ const CoachPage = () => {
                         key={`${lessonId}-s${sIdx + 1}`}
                         header={
                           <div className="flex justify-content-between align-items-center w-full">
-                            <div className="flex align-items-center gap-2">
+                            <div className="flex align-items-center gap-2 flex-1">
                               <span className="font-semibold">{`Slice ${sIdx + 1}: ${slice.title}`}</span>
                               <Tag 
                                 value={`${sliceProgress}%`}
@@ -1033,14 +1242,32 @@ const CoachPage = () => {
                                 className="text-xs"
                               />
                             </div>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 align-items-center">
+                              {(['Teach', 'Review', 'Reteach'] as NextAction[]).map((action) => (
+                                <Button
+                                  key={action}
+                                  label={action}
+                                  size="small"
+                                  severity={getSliceState(lessonId, sIdx, slice).nextAction === action ? 'info' : 'secondary'}
+                                  outlined={getSliceState(lessonId, sIdx, slice).nextAction !== action}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateSliceNextAction(lessonId, sIdx, 
+                                      getSliceState(lessonId, sIdx, slice).nextAction === action ? undefined : action, 
+                                      slice
+                                    );
+                                  }}
+                                  className="text-xs px-2 py-1"
+                                />
+                              ))}
                               <Button 
                                 icon={allSliceComplete ? "pi pi-check-square" : "pi pi-square"}
                                 rounded 
                                 text
                                 size="small"
-                                severity={allSliceComplete ? "success" : "secondary"}
+                                severity={allSliceComplete ? "success" : "info"}
                                 tooltip="Toggle All Steps"
+                                className="sw-toggle-all-steps"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   showBatchActionDialog(allSliceComplete ? 'incomplete' : 'complete', {sliceKey: key});
@@ -1060,25 +1287,53 @@ const CoachPage = () => {
                               className={`sw-step-card ${state.importance !== 'standard' ? `importance-${state.importance}` : ''} ${state.completed ? 'completed' : ''}`}
                             >
                               <div className="flex justify-content-between align-items-center mb-2 sw-step-header">
-                                <div className="flex align-items-center gap-2">
+                                <div className="flex align-items-center gap-2 flex-1">
                                   <Checkbox 
                                     checked={state.completed}
                                     onChange={(e: any) => updateStep(lessonId, sIdx, stIdx, { completed: e.checked || false }, slice)}
                                     className="sw-step-checkbox"
                                   />
-                                  <span className="sw-step-description">
-                                    {state.description || `Step ${stIdx + 1}`}
-                                  </span>
+                                  {editingStep?.lessonId === lessonId && editingStep?.sliceIndex === sIdx && editingStep?.stepIndex === stIdx ? (
+                                    <InputTextarea
+                                      value={state.description}
+                                      onChange={(e) => updateStep(lessonId, sIdx, stIdx, { description: e.target.value }, slice)}
+                                      onBlur={() => setEditingStep(null)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                          e.preventDefault();
+                                          setEditingStep(null);
+                                        }
+                                        if (e.key === 'Escape') {
+                                          setEditingStep(null);
+                                        }
+                                      }}
+                                      autoFocus
+                                      className="flex-1"
+                                      rows={2}
+                                    />
+                                  ) : (
+                                    <span 
+                                      className="sw-step-description flex-1 cursor-pointer"
+                                      onClick={() => setEditingStep({lessonId, sliceIndex: sIdx, stepIndex: stIdx})}
+                                      title="Click to edit step description"
+                                    >
+                                      {state.description || `Step ${stIdx + 1}`}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="flex gap-2 sw-step-tags">
-                                  <Tag 
-                                    severity="info" 
-                                    value={`${Math.round(state.confidence)}%`} 
-                                  />
+                                  <div className={`sw-confidence-chip ${
+                                    state.confidence >= 80 ? 'confidence-high' : 
+                                    state.confidence >= 60 ? 'confidence-medium' : 'confidence-low'
+                                  }`}>
+                                    <i className="pi pi-circle-fill" style={{ fontSize: '8px' }}></i>
+                                    {Math.round(state.confidence)}%
+                                  </div>
                                   {state.importance !== 'standard' && (
                                     <Tag 
                                       severity={state.importance === 'critical' ? 'danger' : 'warning'}
                                       value={state.importance}
+                                      className="text-xs"
                                     />
                                   )}
                                 </div>
@@ -1120,13 +1375,21 @@ const CoachPage = () => {
                                     <label className="block text-sm font-semibold mb-2">
                                       Next Action
                                     </label>
-                                    <Dropdown
-                                      value={state.nextAction}
-                                      options={['Teach', 'Review', 'Reteach']}
-                                      placeholder="Next..."
-                                      className="w-full"
-                                      onChange={(e) => updateStep(lessonId, sIdx, stIdx, { nextAction: e.value as NextAction }, slice)}
-                                    />
+                                    <div className="flex gap-1">
+                                      {(['Teach', 'Review', 'Reteach'] as NextAction[]).map((action) => (
+                                        <Button
+                                          key={action}
+                                          label={action}
+                                          size="small"
+                                          severity={state.nextAction === action ? 'info' : 'secondary'}
+                                          outlined={state.nextAction !== action}
+                                          onClick={() => updateStep(lessonId, sIdx, stIdx, { 
+                                            nextAction: state.nextAction === action ? undefined : action 
+                                          }, slice)}
+                                          className="flex-1"
+                                        />
+                                      ))}
+                                    </div>
                                   </div>
                                   
                                   <div className="col-12">
@@ -1136,7 +1399,7 @@ const CoachPage = () => {
                                     <InputTextarea 
                                       value={state.notes}
                                       onChange={(e) => updateStep(lessonId, sIdx, stIdx, { notes: e.target.value }, slice)}
-                                      placeholder="Add your coaching observations..."
+                                      placeholder="Add observations, corrections, or student questions..."
                                       rows={3}
                                       className="sw-notes-control"
                                     />
@@ -1207,66 +1470,28 @@ const CoachPage = () => {
             </div>
             
             {sidebarTab === 'summary' && (
-              <SessionSummaryGrid
-                summaryData={summaryData}
-                onExport={() => {
-                  // TODO: Implement export functionality
-                  console.log('Export session data');
-                }}
-                onPrint={() => {
-                  // TODO: Implement print functionality
-                  console.log('Print session data');
-                }}
+              <AggregateSessionSummary
+                students={student ? allStudentsWithStats.filter(s => s.id === student.id) : allStudentsWithStats}
+                onExport={handleExport}
+                onPrint={handlePrint}
               />
             )}
             {sidebarTab === 'actions' && (
-              <NextSessionCard
-                teachItems={nextSessionItems.filter(item => item.nextAction === 'Teach').map(item => ({
-                  key: `${item.key}-${item.stepNumber}`,
-                  stepNumber: item.stepNumber,
-                  description: item.notes || `Step ${item.stepNumber}`,
-                  lessonName: item.key.split('-')[0] + ' ' + item.key.split('-')[1],
-                  sliceName: item.key.split('-')[2] || 'Unknown',
-                  checked: false
-                }))}
-                reviewItems={nextSessionItems.filter(item => item.nextAction === 'Review').map(item => ({
-                  key: `${item.key}-${item.stepNumber}`,
-                  stepNumber: item.stepNumber,
-                  description: item.notes || `Step ${item.stepNumber}`,
-                  lessonName: item.key.split('-')[0] + ' ' + item.key.split('-')[1],
-                  sliceName: item.key.split('-')[2] || 'Unknown',
-                  checked: false
-                }))}
-                reteachItems={nextSessionItems.filter(item => item.nextAction === 'Reteach').map(item => ({
-                  key: `${item.key}-${item.stepNumber}`,
-                  stepNumber: item.stepNumber,
-                  description: item.notes || `Step ${item.stepNumber}`,
-                  lessonName: item.key.split('-')[0] + ' ' + item.key.split('-')[1],
-                  sliceName: item.key.split('-')[2] || 'Unknown',
-                  checked: false
-                }))}
-                onItemCheck={(key, checked) => {
-                  // TODO: Implement item check functionality
-                  console.log('Item check:', key, checked);
-                }}
-                onPrintSummary={() => {
-                  // TODO: Implement print summary
-                  console.log('Print summary');
-                }}
-                onEmailStudent={() => {
-                  // TODO: Implement email student
-                  console.log('Email student');
-                }}
-                onClearAll={() => {
-                  // TODO: Implement clear all
-                  console.log('Clear all');
-                }}
-              />
+              <div className="space-y-4">
+                <SessionNextActions
+                  nextActions={nextSessionItems}
+                />
+                <AggregateNextActions
+                  students={student ? allStudentsWithStats.filter(s => s.id === student.id) : allStudentsWithStats}
+                  onItemCheck={handleItemCheck}
+                  onStartTest={handleStartTest}
+                />
+              </div>
             )}
             {sidebarTab === 'testdrills' && (
               <TestDrillsUtilities
-                student={student}
-                allStudents={allStudentsWithStats}
+                student={student ? allStudentsWithStats.find(s => s.id === student.id) || null : null}
+                allStudents={student ? allStudentsWithStats.filter(s => s.id === student.id) : allStudentsWithStats}
                 testDrills={testDrills}
                 onStartTest={handleStartTest}
                 onPrintChecklist={handlePrintChecklist}
@@ -1286,9 +1511,19 @@ const CoachPage = () => {
           saveSession(session);
           syncProgressToDataService();
         }}
-        onEndSession={() => {
-          // TODO: Implement end session functionality
-          console.log('End session');
+        onEndSession={async () => {
+          try {
+            // Save current session and sync progress
+            saveSession(session);
+            await syncProgressToDataService();
+            
+            // Navigate to dashboard
+            router.push('/dashboard');
+          } catch (error) {
+            console.error('Error ending session:', error);
+            // Still navigate even if save fails
+            router.push('/dashboard');
+          }
         }}
         onExportSession={() => {
           // TODO: Implement export session
@@ -1458,6 +1693,27 @@ const CoachPage = () => {
            .grid > [class*="col-"] {
              padding: 0.5rem;
            }
+         }
+         
+         /* Toggle All Steps Button */
+         .sw-toggle-all-steps {
+           background-color: var(--surface-100) !important;
+           border: 1px solid var(--surface-300) !important;
+           color: var(--text-color) !important;
+           min-width: 2rem !important;
+           min-height: 2rem !important;
+         }
+         
+         .sw-toggle-all-steps:hover {
+           background-color: var(--primary-color) !important;
+           border-color: var(--primary-color) !important;
+           color: white !important;
+         }
+         
+         .sw-toggle-all-steps.p-button-success {
+           background-color: var(--green-500) !important;
+           border-color: var(--green-500) !important;
+           color: white !important;
          }
        `}</style>
      </div>

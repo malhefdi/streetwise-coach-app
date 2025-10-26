@@ -90,7 +90,7 @@ const StudentHeroCard: React.FC<StudentHeroCardProps> = ({
               style={{ minWidth: '80px', minHeight: '80px' }}
             />
             <div className="flex flex-column gap-2">
-              <h1 className="text-2xl font-bold text-color m-0">
+              <h1 className="title-text m-0">
                 {student.name}
               </h1>
               <div className="flex align-items-center gap-2">
@@ -104,7 +104,7 @@ const StudentHeroCard: React.FC<StudentHeroCardProps> = ({
                   severity="success"
                   className="text-sm"
                 />
-                <span className="text-sm text-color-secondary">sessions</span>
+                <span className="text-sm text-med">sessions</span>
               </div>
             </div>
           </div>
@@ -117,29 +117,29 @@ const StudentHeroCard: React.FC<StudentHeroCardProps> = ({
           <div className="flex flex-column gap-3">
             <div>
               <div className="flex justify-content-between align-items-center mb-2">
-                <span className="font-medium text-color">Plan Progress</span>
-                <span className="text-sm text-color-secondary">
+                <span className="section-text">Plan Progress</span>
+                <span className="text-sm text-med">
                   {studentPlan ? `${studentPlan.lessonIds.length} lessons` : 'No plan'}
                 </span>
               </div>
               <ProgressBar 
                 value={planProgress} 
                 showValue={true}
-                color={getProgressColor(planProgress)}
+                className="sw-progress sw-progress--thick"
                 pt={{
                   value: { 
                     style: { 
+                      background: 'linear-gradient(90deg, var(--sw-primary-400), var(--sw-primary-600))',
                       fontSize: '1.1rem', 
                       fontWeight: 'bold' 
                     } 
                   }
                 }}
-                className="h-2rem"
               />
             </div>
             
             {student.notes && (
-              <div className="text-sm text-color-secondary">
+              <div className="text-sm text-med">
                 <i className="pi pi-info-circle mr-1" />
                 {student.notes.length > 100 
                   ? `${student.notes.substring(0, 100)}...` 
@@ -158,7 +158,7 @@ const StudentHeroCard: React.FC<StudentHeroCardProps> = ({
             <Button
               label="Edit Plan"
               icon="pi pi-pencil"
-              className="p-button-outlined"
+              className="sw-button sw-button--secondary"
               onClick={onEditPlan}
               tooltip="Modify lesson plan"
               tooltipOptions={{ position: 'bottom' }}
@@ -167,7 +167,7 @@ const StudentHeroCard: React.FC<StudentHeroCardProps> = ({
             <Button
               label="Start Coaching"
               icon="pi pi-play"
-              severity="success"
+              className="sw-button sw-button--success"
               onClick={onStartCoaching}
               tooltip="Begin coaching session"
               tooltipOptions={{ position: 'bottom' }}

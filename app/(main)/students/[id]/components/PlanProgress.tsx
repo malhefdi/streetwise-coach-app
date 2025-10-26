@@ -160,7 +160,7 @@ const PlanProgress = ({ plan, progress }: PlanProgressProps) => {
               )}
               
               <div className="grid">
-                {lessons.map((stat, index) => (
+                {lessons.map((stat, index) => stat && (
                   <div key={stat.lesson.id} className="col-12 md:col-6 lg:col-4">
                     <Card className="shadow-2 hover:shadow-4 transition-duration-200 h-full">
                       <div className="flex justify-content-between align-items-start mb-2">
@@ -188,8 +188,8 @@ const PlanProgress = ({ plan, progress }: PlanProgressProps) => {
                             'Not Started'
                           }
                           severity={
-                            stat.status === 'completed' ? 'success' : 
-                            stat.status === 'in-progress' ? 'info' : 'secondary'
+                            stat.status === 'completed' ? 'success' :
+                            stat.status === 'in-progress' ? 'info' : 'info'
                           }
                           className="ml-2"
                         />
