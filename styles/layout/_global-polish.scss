@@ -27,18 +27,17 @@
   }
 }
 
-/* Dashboard-specific layout overrides - Break out of container */
+/* Dashboard-specific layout overrides - Simplified */
 .layout-main-container .sw-dashboard-full-width {
-  /* Calculate the exact offset needed to break out */
-  margin-left: calc(-1 * (4rem + 2rem)) !important;
+  margin-left: calc(-1 * 2rem) !important;
   margin-right: calc(-1 * 2rem) !important;
-  width: calc(100% + 4rem + 4rem) !important;
+  width: calc(100% + 4rem) !important;
 }
 
 /* Override static layout margin for dashboard */
 .layout-static .layout-main-container .sw-dashboard-full-width {
-  margin-left: calc(-1 * (4rem + 2rem + 300px)) !important;
-  width: calc(100% + 4rem + 4rem + 300px) !important;
+  margin-left: calc(-1 * (2rem + 300px)) !important;
+  width: calc(100% + 4rem + 300px) !important;
 }
 
 /* Responsive adjustments for dashboard full-width */
@@ -1094,17 +1093,17 @@
 .sw-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr); /* Desktop: 4 across */
-  gap: var(--sw-space-lg);
-  margin-bottom: var(--sw-space-xl);
+  gap: var(--sw-space-sm);  /* Changed from var(--sw-space-lg) - reduce from 24px to 8px */
+  margin-bottom: var(--sw-space-lg);
   
   .sw-kpi-card {
     background: var(--surface-card);
     border: 1px solid var(--surface-border);
     border-radius: var(--sw-radius-lg);
-    padding: var(--sw-space-lg);
+    padding: var(--sw-space-sm);  /* Changed from var(--sw-space-md) - reduce from 16px to 8px */
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: var(--sw-space-sm);  /* Changed from var(--sw-space-md) - reduce from 16px to 8px */
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
@@ -1129,7 +1128,7 @@
       flex: 1;
       
       .sw-kpi-number {
-        font-size: 2.5rem;
+        font-size: 1.25rem;  /* Changed from 1.5rem - reduce from 24px to 20px */
         font-weight: var(--sw-font-bold);
         color: var(--text-color);
         line-height: 1;
@@ -1137,14 +1136,14 @@
       }
       
       .sw-kpi-label {
-        font-size: var(--sw-text-md);
-        font-weight: var(--sw-font-semibold);
+        font-size: var(--sw-text-sm);  /* Changed from var(--sw-text-base) - reduce from 16px to 14px */
+        font-weight: var(--sw-font-medium);  /* Changed from var(--sw-font-semibold) - lighter weight */
         color: var(--text-color);
-        margin-bottom: var(--sw-space-xs);
+        margin-bottom: 0;  /* Changed from var(--sw-space-xs) - remove margin */
       }
       
       .sw-kpi-subtitle {
-        font-size: var(--sw-text-sm);
+        font-size: var(--sw-text-xs);  /* Changed from var(--sw-text-sm) - reduce from 14px to 12px */
         color: var(--text-color-secondary);
         margin: 0;
         line-height: 1.3;
@@ -1152,8 +1151,9 @@
     }
     
     .sw-kpi-icon {
-      font-size: 2rem;
+      font-size: 1.25rem;  /* Changed from 1.5rem - reduce from 24px to 20px */
       opacity: 0.8;
+      flex-shrink: 0;
     }
   }
 }
@@ -1162,14 +1162,14 @@
   background: var(--surface-card);
   border: 1px solid var(--surface-border);
   border-radius: var(--sw-radius-lg);
-  padding: var(--sw-space-lg);
-  margin-bottom: var(--sw-space-xl);
+  padding: var(--sw-space-md);
+  margin-bottom: var(--sw-space-lg);
   
   .sw-insights-header {
-    margin-bottom: var(--sw-space-md);
+    margin-bottom: var(--sw-space-sm);
     
     .sw-insights-title {
-      font-size: var(--sw-text-lg);
+      font-size: var(--sw-text-md);
       font-weight: var(--sw-font-semibold);
       color: var(--text-color);
       margin: 0;
@@ -1182,13 +1182,13 @@
   .sw-insights-content {
     display: flex;
     flex-direction: column;
-    gap: var(--sw-space-sm);
+    gap: var(--sw-space-xs);
     
     .sw-insight-item {
       display: flex;
       align-items: center;
       gap: var(--sw-space-sm);
-      padding: var(--sw-space-sm);
+      padding: var(--sw-space-xs);
       background: var(--surface-50);
       border-radius: var(--sw-radius-md);
       font-size: var(--sw-text-sm);
@@ -1201,7 +1201,7 @@
       }
       
       i {
-        font-size: 1.25rem;
+        font-size: 1rem;
       }
     }
   }
@@ -1212,14 +1212,14 @@
     background: var(--surface-card);
     border: 1px solid var(--surface-border);
     border-radius: var(--sw-radius-lg);
-    padding: var(--sw-space-lg);
-    height: 100%;
+    padding: var(--sw-space-md);
+    height: auto;
     
     .sw-chart-header {
-      margin-bottom: var(--sw-space-md);
+      margin-bottom: var(--sw-space-sm);
       
       .sw-chart-title {
-        font-size: var(--sw-text-lg);
+        font-size: var(--sw-text-md);
         font-weight: var(--sw-font-semibold);
         color: var(--text-color);
         margin: 0 0 var(--sw-space-xs) 0;
@@ -1233,7 +1233,8 @@
     }
     
     .sw-chart-content {
-      height: 300px;
+      height: auto;
+      min-height: 200px;
     }
   }
 }
@@ -1311,15 +1312,26 @@
   }
   
   .sw-insights-card {
-    padding: var(--sw-space-md);
+    padding: var(--sw-space-sm);
+    margin-bottom: var(--sw-space-md);
+    
+    .sw-insights-header {
+      margin-bottom: var(--sw-space-xs);
+      
+      .sw-insights-title {
+        font-size: var(--sw-text-sm);
+      }
+    }
     
     .sw-insights-content {
+      gap: var(--sw-space-xs);
+      
       .sw-insight-item {
         padding: var(--sw-space-xs);
         font-size: var(--sw-text-xs);
         
         i {
-          font-size: 1rem;
+          font-size: 0.875rem;
         }
       }
     }
@@ -1327,10 +1339,18 @@
   
   .sw-charts-section {
     .sw-chart-card {
-      padding: var(--sw-space-md);
+      padding: var(--sw-space-sm);
+      
+      .sw-chart-header {
+        margin-bottom: var(--sw-space-xs);
+        
+        .sw-chart-title {
+          font-size: var(--sw-text-sm);
+        }
+      }
       
       .sw-chart-content {
-        height: 250px;
+        min-height: 180px;
       }
     }
   }
@@ -1364,8 +1384,20 @@
       
       .sw-kpi-content {
         .sw-kpi-number {
-          font-size: 1.75rem;
+          font-size: 1.25rem;
         }
+        
+        .sw-kpi-label {
+          font-size: var(--sw-text-sm);
+        }
+        
+        .sw-kpi-subtitle {
+          font-size: var(--sw-text-xs);
+        }
+      }
+      
+      .sw-kpi-icon {
+        font-size: 1.25rem;
       }
     }
   }

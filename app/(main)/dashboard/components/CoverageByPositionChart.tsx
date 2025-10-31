@@ -34,7 +34,7 @@ const CoverageByPositionChart: React.FC<CoverageByPositionChartProps> = ({
         <div className={`sw-chart-container ${className}`}>
             <div className="sw-chart">
                 {data.map(({ position, count, percentage }) => (
-                    <div key={position} className="mb-3">
+                    <div key={position} className="mb-2">
                         <div className="flex justify-content-between align-items-center mb-1">
                             <div className="flex align-items-center gap-2">
                                 <i className={`${positionIcons[position] || positionIcons.Unknown} text-sm`}></i>

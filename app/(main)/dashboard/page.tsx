@@ -278,20 +278,23 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* KPI Cards - 2x2 Grid */}
+        {/* KPI Cards - Compact Layout */}
         <div className="sw-kpi-grid">
           <Card className="sw-kpi-card">
+            <div className="sw-kpi-icon">
+              <i className="pi pi-users text-blue-500"></i>
+            </div>
             <div className="sw-kpi-content">
               <div className="sw-kpi-number">{demoData.totalStudents}</div>
               <div className="sw-kpi-label">Total Students</div>
               <div className="sw-kpi-subtitle">Active roster</div>
             </div>
-            <div className="sw-kpi-icon">
-              <i className="pi pi-users text-blue-500"></i>
-            </div>
           </Card>
 
           <Card className="sw-kpi-card">
+            <div className="sw-kpi-icon">
+              <i className="pi pi-check-circle text-green-500"></i>
+            </div>
             <div className="sw-kpi-content">
               <div className="sw-kpi-number text-green-500">{demoData.studentsWithPlans}</div>
               <div className="sw-kpi-label">With Lesson Plans</div>
@@ -299,30 +302,27 @@ const DashboardPage = () => {
                 {Math.round((demoData.studentsWithPlans / demoData.totalStudents) * 100)}% of students
               </div>
             </div>
-            <div className="sw-kpi-icon">
-              <i className="pi pi-check-circle text-green-500"></i>
-            </div>
           </Card>
 
           <Card className="sw-kpi-card">
+            <div className="sw-kpi-icon">
+              <i className="pi pi-chart-line text-orange-500"></i>
+            </div>
             <div className="sw-kpi-content">
               <div className="sw-kpi-number text-orange-500">{demoData.averageProgress}%</div>
               <div className="sw-kpi-label">Avg. Progress</div>
               <div className="sw-kpi-subtitle">Across all plans</div>
             </div>
-            <div className="sw-kpi-icon">
-              <i className="pi pi-chart-line text-orange-500"></i>
-            </div>
           </Card>
 
           <Card className="sw-kpi-card">
+            <div className="sw-kpi-icon">
+              <i className="pi pi-book text-purple-500"></i>
+            </div>
             <div className="sw-kpi-content">
               <div className="sw-kpi-number text-purple-500">{demoData.totalLessons}</div>
               <div className="sw-kpi-label">Total Lessons</div>
               <div className="sw-kpi-subtitle">{demoData.totalSlices} slices available</div>
-            </div>
-            <div className="sw-kpi-icon">
-              <i className="pi pi-book text-purple-500"></i>
             </div>
           </Card>
         </div>
@@ -355,7 +355,7 @@ const DashboardPage = () => {
         {demoData.totalStudents > 0 && (
           <div className="sw-charts-section">
             <div className="grid">
-              <div className="col-12 md:col-8">
+              <div className="col-12">
                 <Card className="sw-chart-card">
                   <div className="sw-chart-header">
                     <h3 className="sw-chart-title">Coverage by Position</h3>
@@ -373,19 +373,6 @@ const DashboardPage = () => {
                 </Card>
               </div>
 
-              <div className="col-12 md:col-4">
-                <Card className="sw-chart-card">
-                  <div className="sw-chart-header">
-                    <h3 className="sw-chart-title">Principles Race</h3>
-                    <p className="sw-chart-subtitle">Usage Rankings</p>
-                  </div>
-                  <div className="sw-chart-content">
-                    <AnimatedBarChart 
-                      data={principleRadarData}
-                    />
-                  </div>
-                </Card>
-              </div>
             </div>
           </div>
         )}
