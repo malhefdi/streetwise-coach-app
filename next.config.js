@@ -1,8 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    reactStrictMode: false,
+    reactStrictMode: true,
     eslint: {
-        ignoreDuringBuilds: true
+        ignoreDuringBuilds: false
+    },
+    typescript: {
+        ignoreBuildErrors: false
+    },
+    images: {
+        domains: [],
+        remotePatterns: [
+            {
+                protocol: 'https',
+                hostname: '**',
+            },
+        ],
     },
     async redirects() {
         return [
@@ -12,6 +24,12 @@ const nextConfig = {
                 permanent: true
             }
         ];
-    }
-}; 
+    },
+    experimental: {
+        serverActions: {
+            bodySizeLimit: '2mb',
+        },
+    },
+}
+
 module.exports = nextConfig
