@@ -1,28 +1,24 @@
-import { Metadata } from 'next';
-import Layout from '../../layout/layout';
+'use client'
+
+import { Sidebar } from '@/components/layout/Sidebar'
+import { Header } from '@/components/layout/Header'
 
 interface AppLayoutProps {
-    children: React.ReactNode;
+  children: React.ReactNode
 }
 
-export const metadata: Metadata = {
-    title: 'StreetWise Coach',
-    description: 'The ultimate collection of design-agnostic, flexible and accessible React UI Components.',
-    robots: { index: false, follow: false },
-    viewport: { initialScale: 1, width: 'device-width' },
-    openGraph: {
-        type: 'website',
-        title: 'StreetWise Coach',
-        url: 'https://www.streetwisebjj.com/',
-        description: 'The ultimate coaching platform from StreetWise BJJ.',
-        images: ['https://www.primefaces.org/static/social/sakai-react.png'],
-        ttl: 604800
-    },
-    icons: {
-        icon: '/favicon.ico'
-    }
-};
-
 export default function AppLayout({ children }: AppLayoutProps) {
-    return <Layout>{children}</Layout>;
+  return (
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header />
+        <main className="flex-1 overflow-y-auto">
+          <div className="container mx-auto px-6 py-8 max-w-7xl">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
+  )
 }
